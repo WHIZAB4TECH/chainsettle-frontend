@@ -1,4 +1,4 @@
-'use client';
+gi'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
@@ -9,7 +9,7 @@ import { useAuthStore } from '@/lib/hooks/use-auth-store';
 import { MilestoneTimeline } from '@/components/milestones/MilestoneTimeline';
 import { ShipmentMeta } from '@/components/shipments/ShipmentMeta';
 import { ShipmentProgress } from '@/components/shipments/ShipmentProgress';
-import { shipmentStatusBadge, timeAgo } from '@/lib/utils';
+import { shipmentStatusBadge, timeAgo, deriveUserRole, roleBadge } from '@/lib/utils';
 import type { Shipment } from '@/types';
 
 const POLL_INTERVAL_MS = 15_000;
@@ -102,19 +102,8 @@ export default function ShipmentDetailPage() {
     );
   }
 
-  const isBuyer = address === shipment.buyerAddress;
-  const isSupplier = address === shipment.supplierAddress;
-  const isLogistics = address === shipment.logisticsAddress;
-  const isArbiter = address === shipment.arbiterAddress;
-  const userRole = isBuyer
-    ? 'buyer'
-    : isSupplier
-    ? 'supplier'
-    : isLogistics
-    ? 'logistics'
-    : isArbiter
-    ? 'arbiter'
-    : 'observer';
+  const userRole = deriveUserRole(address, shipment);
+  const role = roleBadge(userRole);
 
   return (
     <div>
@@ -133,11 +122,13 @@ export default function ShipmentDetailPage() {
           <div className="flex items-center gap-2.5 mb-1">
             <h1 className="text-xl font-semibold text-gray-900">{shipment.id}</h1>
             <span className={shipmentStatusBadge(shipment.status)}>{shipment.status}</span>
+            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${role.className}`}>
+              {userRole === 'observer' ? role.label : `Your role: ${role.label}`}
+            </span>
           </div>
           <div className="flex items-center gap-3">
             <p className="text-xs text-gray-400">
-              Created {timeAgo(shipment.createdAt)} · Your role:{' '}
-              <span className="font-medium text-gray-600 capitalize">{userRole}</span>
+              Created {timeAgo(shipment.createdAt)}
             </p>
             {lastUpdated && (
               <p className="text-xs text-gray-300">
