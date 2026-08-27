@@ -159,6 +159,17 @@ chainsettle-frontend/
 
 ---
 
+## Internationalization
+
+The frontend uses `next-intl` with English as the default locale. Translation messages live in `src/i18n/messages/en.json`, and supported locales are declared in `src/i18n/config.ts`.
+
+To add a locale:
+
+1. Copy `src/i18n/messages/en.json` to a new file such as `src/i18n/messages/fr.json` and translate its values.
+2. Add the locale code to the `locales` array in `src/i18n/config.ts`.
+3. Load the new message bundle in `src/app/providers.tsx` and pass the selected locale and messages to `NextIntlClientProvider`.
+4. Keep translation keys stable across locale files so components can use the same `useTranslations` calls.
+
 ## Key Flows
 
 ### Authentication (Sign-In With Stellar)

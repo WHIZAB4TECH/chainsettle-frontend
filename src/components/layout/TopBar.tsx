@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/hooks/use-auth-store';
 import { shortAddress } from '@/lib/utils';
+import { useTranslations } from 'next-intl';
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -14,6 +15,7 @@ interface TopBarProps {
 export function TopBar({ onMenuClick }: TopBarProps) {
   const network = process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? 'testnet';
   const { address, logout } = useAuthStore();
+  const t = useTranslations('navigation');
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -52,7 +54,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
       <button
         onClick={onMenuClick}
         className="md:hidden p-2 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-        aria-label="Toggle sidebar"
+        aria-label={t('toggleSidebar')}
       >
         <Menu className="w-5 h-5" />
       </button>
@@ -67,14 +69,14 @@ export function TopBar({ onMenuClick }: TopBarProps) {
           }`}
         >
           <Wifi className="w-3 h-3" />
-          {network === 'mainnet' ? 'Mainnet' : 'Testnet'}
+          {network === 'mainnet' ? t('mainnet') : t('testnet')}
         </span>
 
         {/* Notifications */}
         <Link
           href="/notifications"
           className="relative p-2 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-          aria-label="Notifications"
+          aria-label={t('notificationsLabel')}
         >
           <Bell className="w-4.5 h-4.5" />
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-red-500" />
@@ -101,7 +103,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                   ) : (
                     <Copy className="w-3.5 h-3.5 text-gray-400" />
                   )}
-                  {copied ? 'Copied!' : 'Copy address'}
+                  {copied ? t('copied') : t('copyAddress')}
                 </button>
 
                 <a
@@ -112,7 +114,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
-                  View on Stellar Expert
+                  {t('viewOnStellarExpert')}
                 </a>
 
                 <div className="border-t border-gray-50 my-1" />
@@ -122,7 +124,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  Disconnect wallet
+                  {t('disconnectWallet')}
                 </button>
               </div>
             )}

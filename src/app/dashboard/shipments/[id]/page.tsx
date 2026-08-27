@@ -1,8 +1,8 @@
-gi'use client';
+'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, RefreshCw, Loader2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Loader2, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { shipmentsApi } from '@/lib/api/services';
 import { useAuthStore } from '@/lib/hooks/use-auth-store';
@@ -137,18 +137,29 @@ export default function ShipmentDetailPage() {
             )}
           </div>
         </div>
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className="btn-secondary text-xs"
-        >
-          {syncing ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="w-3.5 h-3.5" />
-          )}
-          Sync from chain
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/dashboard/shipments/${shipment.id}/print`}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-secondary text-xs"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            Print / Export PDF
+          </Link>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="btn-secondary text-xs"
+          >
+            {syncing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="w-3.5 h-3.5" />
+            )}
+            Sync from chain
+          </button>
+        </div>
       </div>
 
       {/* Progress bar */}

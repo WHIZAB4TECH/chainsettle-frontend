@@ -69,3 +69,11 @@
   .badge-disputed  { @apply badge bg-red-50 text-red-700; }
   .badge-resolved  { @apply badge bg-purple-50 text-purple-700; }
 }
+
+@media print {
+  @page { margin: 16mm; }
+
+  body { background: white; }
+  .no-print { display: none !important; }
+  .print-page { max-width: none; }
+}

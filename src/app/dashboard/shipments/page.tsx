@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Package, Search } from 'lucide-react';
@@ -11,6 +11,7 @@ import { ShipmentCardSkeleton } from '@/components/shipments/ShipmentCardSkeleto
 import { EmptyState } from '@/components/EmptyState';
 import { Pagination } from '@/components/Pagination';
 import type { Shipment, ShipmentStatus } from '@/types';
+import { useTranslations } from 'next-intl';
 
 const PAGE_LIMIT = 10;
 
@@ -31,12 +32,14 @@ export default function ShipmentsPage() {
     Completed: 0,
     Cancelled: 0,
   });
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const t = useTranslations('dashboard');
   const statusTabs: Array<{ label: string; value: ShipmentStatus | '' }> = [
-    { label: 'All', value: '' },
-    { label: 'Active', value: 'Active' },
-    { label: 'Completed', value: 'Completed' },
-    { label: 'Cancelled', value: 'Cancelled' },
+    { label: t('tabs.all'), value: '' },
+    { label: t('tabs.active'), value: 'Active' },
+    { label: t('tabs.completed'), value: 'Completed' },
+    { label: t('tabs.cancelled'), value: 'Cancelled' },
   ];
 
   const validStatusValues = ['Active', 'Completed', 'Cancelled'];
@@ -96,6 +99,12 @@ export default function ShipmentsPage() {
     setStatusFilter(paramStatus as ShipmentStatus | '');
   }, [searchParams]);
 
+  useEffect(() => {
+    if (searchParams?.get('focus') !== 'search') return;
+    searchInputRef.current?.focus();
+    router.replace('/dashboard/shipments');
+  }, [router, searchParams]);
+
   // Reset to page 1 when search or filter changes
   useEffect(() => {
     setPage(1);
@@ -113,12 +122,14 @@ export default function ShipmentsPage() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Shipments</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {(statusFilter ? statusCounts[statusFilter] : statusCounts.All) || shipments.length} shipment{((statusFilter ? statusCounts[statusFilter] : statusCounts.All) || shipments.length) !== 1 ? 's' : ''} found
+            {t('shipmentCount', {
+              count: (statusFilter ? statusCounts[statusFilter] : statusCounts.All) || shipments.length,
+            })}
           </p>
         </div>
         <Link href="/dashboard/shipments/create" className="btn-primary">
           <Plus className="w-4 h-4" />
-          New shipment
+          {t('newShipment')}
         </Link>
       </div>
 
@@ -157,8 +168,9 @@ export default function ShipmentsPage() {
         <div className="relative max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
+            ref={searchInputRef}
             type="text"
-            placeholder="Search shipment ID or address…"
+            placeholder={t('searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="input pl-9"
@@ -176,24 +188,24 @@ export default function ShipmentsPage() {
       ) : shipments.length === 0 ? (
         <EmptyState
           icon={Package}
-          title="No shipments yet"
-          description="Create your first shipment to get started."
+          title={t('empty.title')}
+          description={t('empty.description')}
           action={
             <Link href="/dashboard/shipments/create" className="btn-primary inline-flex">
               <Plus className="w-4 h-4" />
-              New shipment
+              {t('newShipment')}
             </Link>
           }
         />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={Search}
-          title="No results found"
-          description="No shipments match your current search or filter."
+          title={t('empty.noResultsTitle')}
+          description={t('empty.noResultsDescription')}
           action={
             <Link href="/dashboard/shipments/create" className="btn-primary inline-flex">
               <Plus className="w-4 h-4" />
-              New shipment
+              {t('newShipment')}
             </Link>
           }
         />
