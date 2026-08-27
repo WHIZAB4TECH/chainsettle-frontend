@@ -21,9 +21,21 @@
   h1, h2, h3, h4 {
     @apply font-semibold tracking-tight;
   }
+
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2;
+  }
 }
 
 @layer components {
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:rounded-xl focus:shadow-lg focus:ring-2 focus:ring-brand-500 focus:text-sm focus:font-medium;
+  }
+
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
   }
@@ -49,7 +61,7 @@
   }
 
   .input {
-    @apply w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all;
+    @apply w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus-visible:border-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/20 transition-all;
   }
 
   .label {
