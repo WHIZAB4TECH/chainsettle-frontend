@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Activity,
   X,
+  Settings,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/hooks/use-auth-store';
 import { notificationsApi } from '@/lib/api/services';
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/shipments', label: 'Shipments', icon: Package },
   { href: '/notifications',       label: 'Notifications', icon: Bell },
   { href: '/dashboard/events',    label: 'Chain Events', icon: Activity },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 
 interface SidebarProps {
@@ -29,7 +31,7 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { address, logout } = useAuthStore();
+  const { address, displayName, logout } = useAuthStore();
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Fetch unread count on mount and when returning from notifications page
@@ -109,7 +111,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </div>
           <div className="min-w-0">
             <p className="text-xs font-medium text-gray-900 truncate">
-              {address ? shortAddress(address) : 'Not connected'}
+              {displayName || (address ? shortAddress(address) : 'Not connected')}
             </p>
             <p className="text-[10px] text-gray-400">Stellar Testnet</p>
           </div>

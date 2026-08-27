@@ -101,6 +101,9 @@ async function waitForConfirmation(txHash: string): Promise<string> {
     const result = await rpc.getTransaction(txHash);
 
     if (result.status === SorobanRpc.Api.GetTransactionStatus.SUCCESS) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('chainsettle:transaction-complete'));
+      }
       return txHash;
     }
 

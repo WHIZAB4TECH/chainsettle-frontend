@@ -5,9 +5,11 @@ import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 import { notificationsApi } from '@/lib/api/services';
 import { EmptyState } from '@/components/EmptyState';
 import { timeAgo } from '@/lib/utils';
+import { useAuthStore } from '@/lib/hooks/use-auth-store';
 import type { Notification } from '@/types';
 
 export default function NotificationsPage() {
+  const preferences = useAuthStore((state) => state.notificationPreferences);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +36,13 @@ export default function NotificationsPage() {
     );
   };
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const visibleNotifications = notifications.filter((notification) => {
+    const type = notification.type.toLowerCase();
+    if (type.includes('milestone') || type.includes('proof') || type.includes('dispute')) return preferences.milestoneUpdates;
+    if (type.includes('system') || type.includes('account')) return preferences.systemAlerts;
+    return preferences.shipmentUpdates;
+  });
+  const unreadCount = visibleNotifications.filter((n) => !n.read).length;
 
   return (
     <div>
@@ -57,7 +65,7 @@ export default function NotificationsPage() {
         <div className="flex justify-center py-16">
           <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
         </div>
-      ) : notifications.length === 0 ? (
+      ) : visibleNotifications.length === 0 ? (
         <EmptyState
           icon={Bell}
           title="No notifications yet"
@@ -65,7 +73,7 @@ export default function NotificationsPage() {
         />
       ) : (
         <div className="card divide-y divide-gray-50">
-          {notifications.map((n) => (
+          {visibleNotifications.map((n) => (
             <div
               key={n.id}
               onClick={() => !n.read && handleMarkRead(n.id)}
