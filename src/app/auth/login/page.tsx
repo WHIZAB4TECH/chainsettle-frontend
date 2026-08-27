@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Wallet, ShieldCheck, Zap, Globe } from 'lucide-react';
 import { connectFreighter, isFreighterInstalled, signNonce } from '@/lib/stellar/freighter';
@@ -10,7 +10,7 @@ import { Networks } from '@stellar/stellar-sdk';
 
 type Step = 'idle' | 'connecting' | 'signing' | 'verifying' | 'done';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const params = useSearchParams();
   const callbackUrl = params.get('callbackUrl') ?? '/dashboard/shipments';
@@ -196,5 +196,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }
