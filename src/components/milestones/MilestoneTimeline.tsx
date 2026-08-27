@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   CheckCircle2,
   Clock,
@@ -27,6 +27,13 @@ interface Props {
 }
 
 export function MilestoneTimeline({ shipment, userRole, onUpdate }: Props) {
+  const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
+
   return (
     <div className="card divide-y divide-gray-50">
       {shipment.milestones.map((milestone, i) => (
@@ -37,8 +44,14 @@ export function MilestoneTimeline({ shipment, userRole, onUpdate }: Props) {
           userRole={userRole}
           onUpdate={onUpdate}
           isLast={i === shipment.milestones.length - 1}
+          onError={(msg) => setError(msg)}
         />
       ))}
+      {error && (
+        <div ref={errorRef} tabIndex={-1} className="p-4 bg-red-50 border-t border-red-100" role="alert" aria-live="assertive">
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -48,12 +61,15 @@ function MilestoneRow({
   shipment,
   userRole,
   onUpdate,
+  isLast,
+  onError,
 }: {
   milestone: Milestone;
   shipment: Shipment;
   userRole: string;
   onUpdate: () => void;
   isLast: boolean;
+  onError: (msg: string) => void;
 }) {
   const { address } = useAuthStore();
   const [loading, setLoading] = useState(false);
@@ -81,7 +97,7 @@ function MilestoneRow({
       await fn();
       onUpdate();
     } catch (err: any) {
-      alert(err?.message ?? 'Transaction failed');
+      onError(err?.message ?? 'Transaction failed');
     } finally {
       setLoading(false);
     }
@@ -153,6 +169,7 @@ function MilestoneRow({
               ? 'bg-amber-50'
               : 'bg-gray-50',
           )}
+          aria-hidden="true"
         >
           {statusIcon[milestone.status]}
         </div>
@@ -182,7 +199,8 @@ function MilestoneRow({
                 }
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-brand-600 hover:underline font-mono truncate max-w-xs"
+                className="text-xs text-brand-600 hover:underline font-mono truncate max-w-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                aria-label="View proof hash (opens in new tab)"
               >
                 {milestone.proofHash}
               </a>
@@ -199,8 +217,8 @@ function MilestoneRow({
           {/* Actions */}
           <div className="flex flex-wrap gap-2 mt-3">
             {loading && (
-              <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <div className="flex items-center gap-1.5 text-xs text-gray-500" aria-live="polite" aria-label="Transaction in progress">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
                 Waiting for Freighter…
               </div>
             )}
@@ -217,6 +235,7 @@ function MilestoneRow({
                       onChange={(e) => setProofInput(e.target.value)}
                       className="input flex-1 text-xs"
                       onKeyDown={(e) => e.key === 'Enter' && handleSubmitProof()}
+                      aria-label="Proof hash input"
                     />
                     <button onClick={handleSubmitProof} className="btn-primary text-xs">
                       Submit
