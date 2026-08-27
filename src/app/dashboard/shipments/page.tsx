@@ -124,7 +124,7 @@ export default function ShipmentsPage() {
 
       {/* Filters */}
       <div className="mb-5 space-y-4">
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap" role="tablist" aria-label="Filter shipments by status">
           {statusTabs.map((tab) => {
             const isActive = tab.value === statusFilter;
             const count = statusCounts[tab.label as keyof typeof statusCounts] ?? 0;
@@ -133,6 +133,8 @@ export default function ShipmentsPage() {
               <button
                 key={tab.label}
                 type="button"
+                role="tab"
+                aria-selected={isActive}
                 onClick={() => {
                   const params = new URLSearchParams(searchParams as any);
                   if (tab.value) {
@@ -142,7 +144,7 @@ export default function ShipmentsPage() {
                   }
                   router.replace(`/dashboard/shipments${params.toString() ? `?${params.toString()}` : ''}`);
                 }}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 ${
                   isActive
                     ? 'bg-slate-900 text-white'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -155,12 +157,13 @@ export default function ShipmentsPage() {
         </div>
 
         <div className="relative max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden="true" />
           <input
             type="text"
             placeholder="Search shipment ID or address…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search shipments"
             className="input pl-9"
           />
         </div>
@@ -168,7 +171,7 @@ export default function ShipmentsPage() {
 
       {/* Shipments list */}
       {loading ? (
-        <div className="space-y-3">
+        <div className="space-y-3" aria-busy="true" aria-label="Loading shipments">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <ShipmentCardSkeleton key={i} />
           ))}

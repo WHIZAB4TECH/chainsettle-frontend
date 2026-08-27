@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -31,6 +31,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { address, logout } = useAuthStore();
   const [unreadCount, setUnreadCount] = useState(0);
+  const sidebarRef = useRef<HTMLElement>(null);
 
   // Fetch unread count on mount and when returning from notifications page
   useEffect(() => {
@@ -42,8 +43,36 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
   const badgeLabel = unreadCount > 99 ? '99+' : String(unreadCount);
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'Tab' && open && sidebarRef.current) {
+        const focusable = sidebarRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
   return (
     <aside
+      ref={sidebarRef}
       className={cn(
         // Base styles
         'w-60 bg-white border-r border-gray-100 flex flex-col flex-shrink-0',
@@ -52,6 +81,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         'md:relative md:translate-x-0 md:z-auto md:transition-none',
         open ? 'translate-x-0' : '-translate-x-full',
       )}
+      aria-hidden={!open}
     >
       {/* Logo + close button (close only visible on mobile) */}
       <div className="px-5 py-5 border-b border-gray-100 flex items-center justify-between">
@@ -63,7 +93,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </div>
         <button
           onClick={onClose}
-          className="md:hidden p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
+          className="md:hidden p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
           aria-label="Close sidebar"
         >
           <X className="w-4 h-4" />
@@ -80,8 +110,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               key={href}
               href={href}
               onClick={onClose}
+              aria-current={active ? 'page' : undefined}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-inset',
                 active
                   ? 'bg-brand-50 text-brand-700'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
@@ -116,7 +147,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </div>
         <button
           onClick={logout}
-          className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50 hover:text-red-600 transition-colors"
+          aria-label="Sign out"
+          className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50 hover:text-red-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-inset"
         >
           <LogOut className="w-4 h-4" />
           Sign out
