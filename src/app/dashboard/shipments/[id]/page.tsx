@@ -1,16 +1,21 @@
-gi'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { ArrowLeft, RefreshCw, Loader2 } from 'lucide-react';
-import Link from 'next/link';
-import { shipmentsApi } from '@/lib/api/services';
-import { useAuthStore } from '@/lib/hooks/use-auth-store';
-import { MilestoneTimeline } from '@/components/milestones/MilestoneTimeline';
-import { ShipmentMeta } from '@/components/shipments/ShipmentMeta';
-import { ShipmentProgress } from '@/components/shipments/ShipmentProgress';
-import { shipmentStatusBadge, timeAgo, deriveUserRole, roleBadge } from '@/lib/utils';
-import type { Shipment } from '@/types';
+import { useEffect, useRef, useState } from "react";
+import { useParams } from "next/navigation";
+import { ArrowLeft, RefreshCw, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { shipmentsApi } from "@/lib/api/services";
+import { useAuthStore } from "@/lib/hooks/use-auth-store";
+import { MilestoneTimeline } from "@/components/milestones/MilestoneTimeline";
+import { ShipmentMeta } from "@/components/shipments/ShipmentMeta";
+import { ShipmentProgress } from "@/components/shipments/ShipmentProgress";
+import {
+  shipmentStatusBadge,
+  timeAgo,
+  deriveUserRole,
+  roleBadge,
+} from "@/lib/utils";
+import type { Shipment } from "@/types";
 
 const POLL_INTERVAL_MS = 15_000;
 
@@ -41,11 +46,11 @@ export default function ShipmentDetailPage() {
   };
 
   const startPolling = (currentShipment: Shipment) => {
-    if (currentShipment.status !== 'Active') return;
+    if (currentShipment.status !== "Active") return;
 
     intervalRef.current = setInterval(async () => {
       const updated = await fetchShipment(true);
-      if (updated && updated.status !== 'Active') {
+      if (updated && updated.status !== "Active") {
         clearInterval(intervalRef.current!);
         intervalRef.current = null;
       }
@@ -95,7 +100,10 @@ export default function ShipmentDetailPage() {
     return (
       <div className="text-center py-16">
         <p className="text-gray-500">Shipment not found.</p>
-        <Link href="/dashboard/shipments" className="btn-secondary mt-4 inline-flex">
+        <Link
+          href="/dashboard/shipments"
+          className="btn-secondary mt-4 inline-flex"
+        >
           Back to shipments
         </Link>
       </div>
@@ -120,10 +128,18 @@ export default function ShipmentDetailPage() {
       <div className="flex items-start justify-between mb-5">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <h1 className="text-xl font-semibold text-gray-900">{shipment.id}</h1>
-            <span className={shipmentStatusBadge(shipment.status)}>{shipment.status}</span>
-            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${role.className}`}>
-              {userRole === 'observer' ? role.label : `Your role: ${role.label}`}
+            <h1 className="text-xl font-semibold text-gray-900">
+              {shipment.id}
+            </h1>
+            <span className={shipmentStatusBadge(shipment.status)}>
+              {shipment.status}
+            </span>
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${role.className}`}
+            >
+              {userRole === "observer"
+                ? role.label
+                : `Your role: ${role.label}`}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -132,7 +148,8 @@ export default function ShipmentDetailPage() {
             </p>
             {lastUpdated && (
               <p className="text-xs text-gray-300">
-                Last updated: {secondsAgo < 5 ? 'just now' : `${secondsAgo}s ago`}
+                Last updated:{" "}
+                {secondsAgo < 5 ? "just now" : `${secondsAgo}s ago`}
               </p>
             )}
           </div>

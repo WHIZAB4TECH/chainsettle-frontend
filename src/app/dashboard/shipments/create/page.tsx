@@ -1,59 +1,71 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Loader2, AlertCircle } from 'lucide-react';
-import Link from 'next/link';
-import { createShipment } from '@/lib/stellar/contract';
-import { shipmentsApi } from '@/lib/api/services';
-import { useAuthStore } from '@/lib/hooks/use-auth-store';
-import { generateShipmentId, usdcToStroops } from '@/lib/utils';
-import type { CreateMilestoneInput } from '@/types';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  Loader2,
+  AlertCircle,
+  AlertTriangle,
+} from "lucide-react";
+import Link from "next/link";
+import { createShipment } from "@/lib/stellar/contract";
+import { shipmentsApi } from "@/lib/api/services";
+import { useAuthStore } from "@/lib/hooks/use-auth-store";
+import { generateShipmentId, usdcToStroops } from "@/lib/utils";
+import type { CreateMilestoneInput } from "@/types";
 
 const USDC_ADDRESS = process.env.NEXT_PUBLIC_USDC_ADDRESS!;
+const HIGH_VALUE_THRESHOLD_USDC =
+  Number(process.env.NEXT_PUBLIC_HIGH_VALUE_THRESHOLD_USDC) || 1000;
 
 export default function CreateShipmentPage() {
   const router = useRouter();
   const { address } = useAuthStore();
 
   const [shipmentId] = useState(generateShipmentId);
-  const [supplierAddress, setSupplierAddress] = useState('');
-  const [logisticsAddress, setLogisticsAddress] = useState('');
-  const [arbiterAddress, setArbiterAddress] = useState('');
-  const [totalUsdc, setTotalUsdc] = useState('');
+  const [supplierAddress, setSupplierAddress] = useState("");
+  const [logisticsAddress, setLogisticsAddress] = useState("");
+  const [arbiterAddress, setArbiterAddress] = useState("");
+  const [totalUsdc, setTotalUsdc] = useState("");
   const [milestones, setMilestones] = useState<CreateMilestoneInput[]>([
-    { name: 'Goods Dispatched', paymentPercent: 25 },
-    { name: 'In Transit', paymentPercent: 50 },
-    { name: 'Delivered', paymentPercent: 25 },
+    { name: "Goods Dispatched", paymentPercent: 25 },
+    { name: "In Transit", paymentPercent: 50 },
+    { name: "Delivered", paymentPercent: 25 },
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [txStep, setTxStep] = useState('');
+  const [txStep, setTxStep] = useState("");
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
 
   const totalPercent = milestones.reduce((s, m) => s + m.paymentPercent, 0);
   const percentValid = totalPercent === 100;
 
   const addMilestone = () => {
-    setMilestones([...milestones, { name: '', paymentPercent: 0 }]);
+    setMilestones([...milestones, { name: "", paymentPercent: 0 }]);
   };
 
   const removeMilestone = (i: number) => {
     setMilestones(milestones.filter((_, idx) => idx !== i));
   };
 
-  const updateMilestone = (i: number, field: keyof CreateMilestoneInput, value: any) => {
-    setMilestones(milestones.map((m, idx) => (idx === i ? { ...m, [field]: value } : m)));
+  const updateMilestone = (
+    i: number,
+    field: keyof CreateMilestoneInput,
+    value: any,
+  ) => {
+    setMilestones(
+      milestones.map((m, idx) => (idx === i ? { ...m, [field]: value } : m)),
+    );
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!address) return;
-    setError(null);
+  const submitShipment = async () => {
     setLoading(true);
-
     try {
       // Step 1: Call the Soroban contract via Freighter
-      setTxStep('Building transaction…');
+      setTxStep("Building transaction…");
       const txHash = await createShipment({
         callerAddress: address,
         shipmentId,
@@ -66,7 +78,7 @@ export default function CreateShipmentPage() {
       });
 
       // Step 2: Register with the backend
-      setTxStep('Saving to backend…');
+      setTxStep("Saving to backend…");
       await shipmentsApi.create({
         shipmentId,
         buyerAddress: address,
@@ -81,11 +93,24 @@ export default function CreateShipmentPage() {
 
       router.push(`/dashboard/shipments/${shipmentId}`);
     } catch (err: any) {
-      setError(err?.message ?? 'Transaction failed. Please try again.');
+      setError(err?.message ?? "Transaction failed. Please try again.");
     } finally {
       setLoading(false);
-      setTxStep('');
+      setTxStep("");
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!address) return;
+    setError(null);
+
+    if (Number(totalUsdc) >= HIGH_VALUE_THRESHOLD_USDC) {
+      setConfirmationOpen(true);
+      return;
+    }
+
+    await submitShipment();
   };
 
   return (
@@ -100,7 +125,8 @@ export default function CreateShipmentPage() {
 
       <h1 className="text-xl font-semibold text-gray-900 mb-1">New shipment</h1>
       <p className="text-sm text-gray-500 mb-6">
-        Lock USDC in a Soroban escrow contract. Payment releases automatically as milestones are confirmed.
+        Lock USDC in a Soroban escrow contract. Payment releases automatically
+        as milestones are confirmed.
       </p>
 
       {error && (
@@ -113,12 +139,20 @@ export default function CreateShipmentPage() {
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Shipment ID */}
         <div className="card p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Shipment details</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">
+            Shipment details
+          </h2>
           <div className="space-y-4">
             <div>
               <label className="label">Shipment ID</label>
-              <input value={shipmentId} readOnly className="input bg-gray-50 text-gray-500 font-mono text-xs" />
-              <p className="text-xs text-gray-400 mt-1">Auto-generated — unique identifier on-chain</p>
+              <input
+                value={shipmentId}
+                readOnly
+                className="input bg-gray-50 text-gray-500 font-mono text-xs"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Auto-generated — unique identifier on-chain
+              </p>
             </div>
             <div>
               <label className="label">Total amount (USDC)</label>
@@ -142,7 +176,11 @@ export default function CreateShipmentPage() {
           <div className="space-y-4">
             <div>
               <label className="label">Your address (buyer)</label>
-              <input value={address ?? ''} readOnly className="input bg-gray-50 text-gray-500 font-mono text-xs" />
+              <input
+                value={address ?? ""}
+                readOnly
+                className="input bg-gray-50 text-gray-500 font-mono text-xs"
+              />
             </div>
             <div>
               <label className="label">Supplier Stellar address</label>
@@ -174,7 +212,8 @@ export default function CreateShipmentPage() {
                 className="input font-mono text-xs"
               />
               <p className="text-xs text-gray-400 mt-1">
-                Resolves disputes. Can be a trusted third party or a DAO address.
+                Resolves disputes. Can be a trusted third party or a DAO
+                address.
               </p>
             </div>
           </div>
@@ -184,16 +223,22 @@ export default function CreateShipmentPage() {
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-sm font-semibold text-gray-900">Milestones</h2>
-              <p className={`text-xs mt-1 ${percentValid ? 'text-green-700' : 'text-red-600'}`}>
+              <h2 className="text-sm font-semibold text-gray-900">
+                Milestones
+              </h2>
+              <p
+                className={`text-xs mt-1 ${percentValid ? "text-green-700" : "text-red-600"}`}
+              >
                 {percentValid
-                  ? 'Milestone percentages add up to 100%.'
-                  : 'Milestone percentages must sum to 100%.'}
+                  ? "Milestone percentages add up to 100%."
+                  : "Milestone percentages must sum to 100%."}
               </p>
             </div>
             <span
               className={`text-xs font-medium px-2 py-1 rounded-lg ${
-                percentValid ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                percentValid
+                  ? "bg-green-50 text-green-700"
+                  : "bg-red-50 text-red-700"
               }`}
             >
               {totalPercent}% / 100%
@@ -209,7 +254,7 @@ export default function CreateShipmentPage() {
                 <input
                   placeholder="Milestone name"
                   value={m.name}
-                  onChange={(e) => updateMilestone(i, 'name', e.target.value)}
+                  onChange={(e) => updateMilestone(i, "name", e.target.value)}
                   required
                   className="input flex-1"
                 />
@@ -220,11 +265,19 @@ export default function CreateShipmentPage() {
                     max="100"
                     step="1"
                     value={m.paymentPercent}
-                    onChange={(e) => updateMilestone(i, 'paymentPercent', Number(e.target.value))}
+                    onChange={(e) =>
+                      updateMilestone(
+                        i,
+                        "paymentPercent",
+                        Number(e.target.value),
+                      )
+                    }
                     required
                     className="input pr-7"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                    %
+                  </span>
                 </div>
                 {milestones.length > 1 && (
                   <button
@@ -239,7 +292,11 @@ export default function CreateShipmentPage() {
             ))}
           </div>
 
-          <button type="button" onClick={addMilestone} className="btn-ghost text-xs">
+          <button
+            type="button"
+            onClick={addMilestone}
+            className="btn-ghost text-xs"
+          >
             <Plus className="w-3.5 h-3.5" />
             Add milestone
           </button>
@@ -255,10 +312,10 @@ export default function CreateShipmentPage() {
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                {txStep || 'Processing…'}
+                {txStep || "Processing…"}
               </>
             ) : (
-              'Sign & lock funds in escrow'
+              "Sign & lock funds in escrow"
             )}
           </button>
           <Link href="/dashboard/shipments" className="btn-secondary">
@@ -267,9 +324,69 @@ export default function CreateShipmentPage() {
         </div>
 
         <p className="text-xs text-gray-400 text-center">
-          This will open Freighter to sign the transaction. USDC will be locked in the contract until milestones are confirmed.
+          This will open Freighter to sign the transaction. USDC will be locked
+          in the contract until milestones are confirmed.
         </p>
       </form>
+
+      {confirmationOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4"
+          role="presentation"
+        >
+          <div
+            className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="high-value-title"
+          >
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <h2
+              id="high-value-title"
+              className="mb-2 text-lg font-semibold text-gray-900"
+            >
+              Confirm high-value escrow
+            </h2>
+            <p className="mb-4 text-sm leading-6 text-gray-500">
+              You are about to lock{" "}
+              <strong className="text-gray-900">{totalUsdc} USDC</strong> in
+              escrow on{" "}
+              <strong className="text-gray-900">
+                {process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet"
+                  ? "Mainnet"
+                  : "Testnet"}
+              </strong>
+              . Review the recipient details and amount carefully before signing
+              in Freighter.
+            </p>
+            <div className="mb-5 rounded-xl bg-gray-50 p-3 text-xs text-gray-500">
+              This transaction meets or exceeds the high-value threshold of{" "}
+              {HIGH_VALUE_THRESHOLD_USDC.toLocaleString()} USDC.
+            </div>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmationOpen(false)}
+                className="btn-secondary text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmationOpen(false);
+                  void submitShipment();
+                }}
+                className="btn-primary text-sm"
+              >
+                Continue to Freighter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

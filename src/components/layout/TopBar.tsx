@@ -1,32 +1,70 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { Bell, Wifi, Copy, ExternalLink, LogOut, Check, Menu } from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/lib/hooks/use-auth-store';
-import { shortAddress } from '@/lib/utils';
+import { useEffect, useRef, useState } from "react";
+import {
+  Bell,
+  Wifi,
+  Copy,
+  ExternalLink,
+  LogOut,
+  Check,
+  Menu,
+  Loader2,
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/lib/hooks/use-auth-store";
+import { getNativeBalance } from "@/lib/stellar/balance";
+import { shortAddress } from "@/lib/utils";
 
 interface TopBarProps {
   onMenuClick: () => void;
 }
 
 export function TopBar({ onMenuClick }: TopBarProps) {
-  const network = process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? 'testnet';
+  const network = process.env.NEXT_PUBLIC_STELLAR_NETWORK ?? "testnet";
   const { address, logout } = useAuthStore();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [balance, setBalance] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!address) {
+      setBalance(null);
+      return;
+    }
+
+    let active = true;
+    const loadBalance = async () => {
+      try {
+        const nextBalance = await getNativeBalance(address);
+        if (active) setBalance(nextBalance);
+      } catch {
+        if (active) setBalance(null);
+      }
+    };
+
+    loadBalance();
+    const interval = setInterval(loadBalance, 30_000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [address]);
+
+  useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleCopy = async () => {
@@ -38,11 +76,11 @@ export function TopBar({ onMenuClick }: TopBarProps) {
 
   const handleDisconnect = () => {
     logout();
-    router.push('/auth/login');
+    router.push("/auth/login");
   };
 
   const explorerUrl =
-    network === 'mainnet'
+    network === "mainnet"
       ? `https://stellar.expert/explorer/public/account/${address}`
       : `https://stellar.expert/explorer/testnet/account/${address}`;
 
@@ -60,14 +98,16 @@ export function TopBar({ onMenuClick }: TopBarProps) {
       <div className="flex items-center gap-3">
         {/* Network badge */}
         <span
+          role="status"
+          aria-label={`Connected to Stellar ${network === "mainnet" ? "Mainnet" : "Testnet"}`}
           className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg ${
-            network === 'mainnet'
-              ? 'bg-green-50 text-green-700'
-              : 'bg-amber-50 text-amber-700'
+            network === "mainnet"
+              ? "bg-green-50 text-green-700"
+              : "bg-amber-50 text-amber-700"
           }`}
         >
           <Wifi className="w-3 h-3" />
-          {network === 'mainnet' ? 'Mainnet' : 'Testnet'}
+          {network === "mainnet" ? "Mainnet" : "Testnet"}
         </span>
 
         {/* Notifications */}
@@ -83,6 +123,18 @@ export function TopBar({ onMenuClick }: TopBarProps) {
         {/* Wallet address dropdown */}
         {address && (
           <div className="relative" ref={dropdownRef}>
+            <div className="hidden sm:block text-right mr-1">
+              <p className="text-[10px] uppercase tracking-wide text-gray-400">
+                Balance
+              </p>
+              <p className="text-xs font-medium text-gray-700 tabular-nums">
+                {balance === null ? (
+                  <Loader2 className="inline w-3 h-3 animate-spin" />
+                ) : (
+                  `${balance} XLM`
+                )}
+              </p>
+            </div>
             <button
               onClick={() => setOpen((v) => !v)}
               className="inline-flex items-center gap-1.5 text-xs font-mono font-medium px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 transition-colors"
@@ -101,7 +153,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                   ) : (
                     <Copy className="w-3.5 h-3.5 text-gray-400" />
                   )}
-                  {copied ? 'Copied!' : 'Copy address'}
+                  {copied ? "Copied!" : "Copy address"}
                 </button>
 
                 <a
