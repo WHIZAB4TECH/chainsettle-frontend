@@ -2,11 +2,25 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
-import { shipmentStatusBadge, stroopsToUsdc, timeAgo, shortAddress, shipmentProgress } from '@/lib/utils';
+import { ArrowRight, Check } from 'lucide-react';
+import {
+  shipmentStatusBadge,
+  stroopsToUsdc,
+  timeAgo,
+  shortAddress,
+  shipmentProgress,
+} from '@/lib/utils';
 import type { Shipment } from '@/types';
 
-export function ShipmentCard({ shipment }: { shipment: Shipment }) {
+export function ShipmentCard({
+  shipment,
+  selected = false,
+  onSelect,
+}: {
+  shipment: Shipment;
+  selected?: boolean;
+  onSelect?: (selected: boolean) => void;
+}) {
   const progress = shipmentProgress(shipment.milestones);
   const totalUsdc = stroopsToUsdc(shipment.totalAmount);
   const releasedUsdc = stroopsToUsdc(shipment.releasedAmount);
@@ -20,16 +34,18 @@ export function ShipmentCard({ shipment }: { shipment: Shipment }) {
               <span className="text-sm font-semibold text-gray-900 font-mono">{shipment.id}</span>
               <span className={shipmentStatusBadge(shipment.status)}>{shipment.status}</span>
             </div>
-            <p className="text-xs text-gray-400">
-              Supplier: {shortAddress(shipment.supplierAddress)} · {timeAgo(shipment.createdAt)}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm font-semibold text-gray-900">${totalUsdc}</p>
-            <p className="text-xs text-gray-400">${releasedUsdc} released</p>
-          </div>
+          </Link>
         </div>
+        <Link
+          href={`/dashboard/shipments/${shipment.id}`}
+          className="text-right"
+        >
+          <p className="text-sm font-semibold text-gray-900">${totalUsdc}</p>
+          <p className="text-xs text-gray-400">${releasedUsdc} released</p>
+        </Link>
+      </div>
 
+      <Link href={`/dashboard/shipments/${shipment.id}`}>
         {/* Progress bar */}
         <div className="w-full bg-gray-100 rounded-full h-1.5 mb-2" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`${progress}% complete`}>
           <div
@@ -39,12 +55,16 @@ export function ShipmentCard({ shipment }: { shipment: Shipment }) {
         </div>
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-400">
-            {shipment.milestones.filter((m) => m.status === 'Confirmed' || m.status === 'Resolved').length}
+            {
+              shipment.milestones.filter(
+                (m) => m.status === 'Confirmed' || m.status === 'Resolved',
+              ).length
+            }
             /{shipment.milestones.length} milestones done
           </p>
           <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-brand-600 transition-colors" aria-hidden="true" />
         </div>
-      </div>
-    </Link>
+      </Link>
+    </div>
   );
 }

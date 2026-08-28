@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bell, Wifi, Copy, ExternalLink, LogOut, Check, Menu } from 'lucide-react';
+import { Bell, Wifi, Copy, ExternalLink, LogOut, Check, Menu, Wallet, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/hooks/use-auth-store';
+import { useWalletBalance } from '@/lib/hooks/use-wallet-balance';
 import { shortAddress } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 
@@ -70,6 +71,27 @@ export function TopBar({ onMenuClick }: TopBarProps) {
       </button>
       <div className="hidden md:block" />
       <div className="flex items-center gap-3">
+        {address && (
+          <div
+            className="hidden items-center gap-2 rounded-xl bg-gray-50 px-3 py-1.5 text-xs sm:flex"
+            title={balancesError ?? 'Live wallet balance'}
+          >
+            <Wallet className="h-3.5 w-3.5 text-gray-400" />
+            {balancesLoading ? (
+              <span className="text-gray-400">Loading balance...</span>
+            ) : balancesError ? (
+              <span className="inline-flex items-center gap-1 text-red-500">
+                <AlertCircle className="h-3.5 w-3.5" /> Balance unavailable
+              </span>
+            ) : (
+              <span className="font-medium text-gray-700">
+                {Number(balances?.usdc ?? 0).toFixed(2)} USDC
+                <span className="mx-1 text-gray-300">|</span>
+                {Number(balances?.xlm ?? 0).toFixed(2)} XLM
+              </span>
+            )}
+          </div>
+        )}
         {/* Network badge */}
         <span
           className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg ${
@@ -102,7 +124,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
               aria-controls="wallet-dropdown"
               className="inline-flex items-center gap-1.5 text-xs font-mono font-medium px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
             >
-              {shortAddress(address)}
+              {displayName || shortAddress(address)}
             </button>
 
             {open && (
@@ -118,6 +140,15 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                   )}
                   {copied ? t('copied') : t('copyAddress')}
                 </button>
+
+                <a
+                  href="/dashboard/settings"
+                  onClick={() => setOpen(false)}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Wallet className="w-3.5 h-3.5 text-gray-400" />
+                  Profile & settings
+                </a>
 
                 <a
                   href={explorerUrl}

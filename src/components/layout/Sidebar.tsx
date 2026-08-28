@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Activity,
   X,
+  Settings,
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/hooks/use-auth-store';
 import { notificationsApi } from '@/lib/api/services';
@@ -143,7 +144,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </div>
           <div className="min-w-0">
             <p className="text-xs font-medium text-gray-900 truncate">
-              {address ? shortAddress(address) : 'Not connected'}
+              {displayName || (address ? shortAddress(address) : 'Not connected')}
             </p>
             <p className="text-[10px] text-gray-400">{t('network', { network: t('testnet') })}</p>
           </div>
