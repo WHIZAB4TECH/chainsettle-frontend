@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Wallet, ShieldCheck, Zap, Globe } from 'lucide-react';
 import { connectFreighter, isFreighterInstalled, signNonce } from '@/lib/stellar/freighter';
@@ -21,11 +21,16 @@ function LoginPageContent() {
   const [step, setStep] = useState<Step>('idle');
   const [error, setError] = useState<string | null>(null);
   const [hasFreighter, setHasFreighter] = useState<boolean | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+  const statusRef = useRef<HTMLDivElement>(null);
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (isConnected) router.replace(callbackUrl);
   }, [isConnected, router, callbackUrl]);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   // Check for Freighter on mount
   useEffect(() => {
@@ -35,14 +40,11 @@ function LoginPageContent() {
   const handleConnect = async () => {
     setError(null);
     try {
-      // Step 1: Connect wallet
       setStep('connecting');
       const address = await connectFreighter();
 
-      // Step 2: Get nonce from backend
       const nonce = await authApi.getNonce(address);
 
-      // Step 3: Sign the nonce
       setStep('signing');
       const networkPassphrase =
         process.env.NEXT_PUBLIC_STELLAR_NETWORK === 'mainnet'
@@ -51,7 +53,6 @@ function LoginPageContent() {
 
       const signedNonce = await signNonce(nonce, networkPassphrase);
 
-      // Step 4: Verify and get JWT
       setStep('verifying');
       const { accessToken, user } = await authApi.login({
         stellarAddress: address,
@@ -113,6 +114,7 @@ function LoginPageContent() {
                 target="_blank"
                 rel="noreferrer"
                 className="btn-primary text-xs px-3 py-1.5"
+                aria-label="Install Freighter wallet (opens in new tab)"
               >
                 Install Freighter →
               </a>
@@ -121,7 +123,7 @@ function LoginPageContent() {
 
           {/* Error */}
           {error && (
-            <div className="mb-4 p-3.5 rounded-xl bg-red-50 border border-red-100">
+            <div ref={errorRef} tabIndex={-1} className="mb-4 p-3.5 rounded-xl bg-red-50 border border-red-100" role="alert" aria-live="assertive">
               <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
@@ -130,16 +132,17 @@ function LoginPageContent() {
           <button
             onClick={handleConnect}
             disabled={isLoading || hasFreighter === false}
+            aria-describedby={isLoading ? 'login-status' : undefined}
             className="btn-primary w-full text-base py-3"
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {stepLabel[step]}
+                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                <span id="login-status">{stepLabel[step]}</span>
               </>
             ) : (
               <>
-                <Wallet className="w-4 h-4" />
+                <Wallet className="w-4 h-4" aria-hidden="true" />
                 {stepLabel.idle}
               </>
             )}
@@ -147,7 +150,7 @@ function LoginPageContent() {
 
           {/* Steps indicator */}
           {isLoading && (
-            <div className="mt-4 space-y-2">
+            <div ref={statusRef} className="mt-4 space-y-2" role="status" aria-live="polite" aria-label="Login progress">
               {(['connecting', 'signing', 'verifying'] as Step[]).map((s, i) => {
                 const stepOrder: Step[] = ['connecting', 'signing', 'verifying'];
                 const currentIdx = stepOrder.indexOf(step);
@@ -165,6 +168,7 @@ function LoginPageContent() {
                           ? 'bg-brand-600 text-white'
                           : 'bg-gray-100 text-gray-400'
                       }`}
+                      aria-hidden="true"
                     >
                       {isDone ? '✓' : i + 1}
                     </div>
@@ -188,7 +192,7 @@ function LoginPageContent() {
             { icon: Globe, label: 'Cross-border', sub: 'Anywhere, any sector' },
           ].map(({ icon: Icon, label, sub }) => (
             <div key={label} className="card p-3">
-              <Icon className="w-4 h-4 text-brand-600 mx-auto mb-1.5" />
+              <Icon className="w-4 h-4 text-brand-600 mx-auto mb-1.5" aria-hidden="true" />
               <p className="text-xs font-medium text-gray-700">{label}</p>
               <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>
             </div>
