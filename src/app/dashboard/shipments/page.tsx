@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Download, Loader2, Plus, Package, Search, X } from 'lucide-react';
+import { Download, Plus, Package, Search, SlidersHorizontal, X } from 'lucide-react';
 import { shipmentsApi } from '@/lib/api/services';
 import { cancelShipment } from '@/lib/stellar/contract';
 import { useAuthStore } from '@/lib/hooks/use-auth-store';
@@ -13,10 +13,11 @@ import { EmptyState } from '@/components/EmptyState';
 import { Pagination } from '@/components/Pagination';
 import { stroopsToUsdc } from '@/lib/utils';
 import type { Shipment, ShipmentStatus } from '@/types';
+import { useTranslations } from 'next-intl';
 
 const PAGE_LIMIT = 10;
 
-export default function ShipmentsPage() {
+function ShipmentsPageContent() {
   const { address } = useAuthStore();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -25,6 +26,10 @@ export default function ShipmentsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ShipmentStatus | ''>('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [dateField, setDateField] = useState<'created' | 'updated'>('created');
+  const [counterpartyRole, setCounterpartyRole] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -35,15 +40,24 @@ export default function ShipmentsPage() {
     Completed: 0,
     Cancelled: 0,
   });
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const t = useTranslations('dashboard');
   const statusTabs: Array<{ label: string; value: ShipmentStatus | '' }> = [
-    { label: 'All', value: '' },
-    { label: 'Active', value: 'Active' },
-    { label: 'Completed', value: 'Completed' },
-    { label: 'Cancelled', value: 'Cancelled' },
+    { label: t('tabs.all'), value: '' },
+    { label: t('tabs.active'), value: 'Active' },
+    { label: t('tabs.completed'), value: 'Completed' },
+    { label: t('tabs.cancelled'), value: 'Cancelled' },
   ];
 
   const validStatusValues = ['Active', 'Completed', 'Cancelled'];
+  const counterpartyRoles = [
+    { label: 'Any role', value: '' },
+    { label: 'Buyer', value: 'buyer' },
+    { label: 'Supplier', value: 'supplier' },
+    { label: 'Logistics', value: 'logistics' },
+    { label: 'Arbiter', value: 'arbiter' },
+  ];
 
   useEffect(() => {
     if (!address) return;
@@ -115,113 +129,84 @@ export default function ShipmentsPage() {
     }
 
     setStatusFilter(paramStatus as ShipmentStatus | '');
+    setFromDate(searchParams?.get('from') ?? '');
+    setToDate(searchParams?.get('to') ?? '');
+    setDateField(searchParams?.get('date') === 'updated' ? 'updated' : 'created');
+    setCounterpartyRole(searchParams?.get('role') ?? '');
   }, [searchParams]);
+
+  useEffect(() => {
+    if (searchParams?.get('focus') !== 'search') return;
+    searchInputRef.current?.focus();
+    router.replace('/dashboard/shipments');
+  }, [router, searchParams]);
 
   // Reset to page 1 when search or filter changes
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, fromDate, toDate, dateField, counterpartyRole]);
 
-  const filtered = shipments.filter(
-    (s) =>
-      s.id.toLowerCase().includes(search.toLowerCase()) ||
-      s.supplierAddress.toLowerCase().includes(search.toLowerCase()),
-  );
-  const visibleIds = useMemo(
-    () => filtered.map((shipment) => shipment.id),
-    [filtered],
-  );
-  const selectedShipments = shipments.filter((shipment) =>
-    selectedIds.includes(shipment.id),
-  );
-  const cancellableShipments = selectedShipments.filter(
-    (shipment) =>
-      shipment.status === 'Active' &&
-      shipment.buyerAddress === address &&
-      !shipment.milestones.some(
-        (milestone) => milestone.status === 'Confirmed',
-      ),
-  );
-  const allVisibleSelected =
-    visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
-
-  const toggleSelection = (id: string, selected: boolean) => {
-    setSelectedIds((current) =>
-      selected
-        ? [...new Set([...current, id])]
-        : current.filter((item) => item !== id),
-    );
+  const updateFilterUrl = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(key, value);
+    else params.delete(key);
+    router.replace(`/dashboard/shipments${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
-  const toggleSelectAll = () => {
-    setSelectedIds((current) =>
-      allVisibleSelected
-        ? current.filter((id) => !visibleIds.includes(id))
-        : [...new Set([...current, ...visibleIds])],
-    );
+  const clearAdvancedFilters = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('from');
+    params.delete('to');
+    params.delete('date');
+    params.delete('role');
+    router.replace(`/dashboard/shipments${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
-  const exportSelected = () => {
-    const headers = [
-      'Shipment ID',
-      'Status',
-      'Supplier',
-      'Total USDC',
-      'Created',
+  const hasAdvancedFilters = fromDate || toDate || dateField !== 'created' || counterpartyRole;
+
+  const filtered = shipments.filter((shipment) => {
+    const matchesSearch =
+      shipment.id.toLowerCase().includes(search.toLowerCase()) ||
+      shipment.supplierAddress.toLowerCase().includes(search.toLowerCase());
+    const filterDate = (dateField === 'updated' ? shipment.updatedAt : shipment.createdAt).slice(0, 10);
+    const matchesFrom = !fromDate || filterDate >= fromDate;
+    const matchesTo = !toDate || filterDate <= toDate;
+    const roleAddress = counterpartyRole
+      ? shipment[`${counterpartyRole}Address` as 'buyerAddress' | 'supplierAddress' | 'logisticsAddress' | 'arbiterAddress']
+      : '';
+    const matchesRole = !counterpartyRole || Boolean(roleAddress && roleAddress !== address);
+    return matchesSearch && matchesFrom && matchesTo && matchesRole;
+  });
+
+  const exportCsv = () => {
+    const columns = [
+      'Shipment ID', 'Status', 'Created At', 'Updated At', 'Buyer',
+      'Supplier', 'Logistics', 'Arbiter', 'Total Amount', 'Released Amount',
     ];
-    const rows = selectedShipments.map((shipment) => [
+    const escapeCsv = (value: string | number | null) => {
+      const text = String(value ?? '');
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    const rows = filtered.map((shipment) => [
       shipment.id,
       shipment.status,
-      shipment.supplierAddress,
-      stroopsToUsdc(shipment.totalAmount),
       shipment.createdAt,
+      shipment.updatedAt,
+      shipment.buyerAddress,
+      shipment.supplierAddress,
+      shipment.logisticsAddress,
+      shipment.arbiterAddress,
+      shipment.totalAmount,
+      shipment.releasedAmount,
     ]);
-    const csv = [headers, ...rows]
-      .map((row) =>
-        row
-          .map((value) => `"${String(value).replaceAll('"', '""')}"`)
-          .join(','),
-      )
-      .join('\n');
-    const url = URL.createObjectURL(
-      new Blob([csv], { type: 'text/csv;charset=utf-8;' }),
-    );
+    const csv = [columns, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
+    const blob = new Blob([`${csv}\n`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'shipments.csv';
+    link.download = `chainsettle-shipments-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-  };
-
-  const cancelSelected = async () => {
-    if (!address || !cancellableShipments.length) return;
-    const confirmed = window.confirm(
-      `Cancel ${cancellableShipments.length} selected shipment${cancellableShipments.length === 1 ? '' : 's'}? This action cannot be undone.`,
-    );
-    if (!confirmed) return;
-
-    setCancelling(true);
-    try {
-      for (const shipment of cancellableShipments) {
-        await cancelShipment({
-          callerAddress: address,
-          shipmentId: shipment.id,
-        });
-        await shipmentsApi.sync(shipment.id);
-      }
-      setSelectedIds([]);
-      const response = await shipmentsApi.list({
-        buyerAddress: address,
-        status: statusFilter || undefined,
-        page,
-        limit: PAGE_LIMIT,
-      });
-      setShipments(response.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setCancelling(false);
-    }
   };
 
   return (
@@ -231,25 +216,20 @@ export default function ShipmentsPage() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Shipments</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {(statusFilter ? statusCounts[statusFilter] : statusCounts.All) ||
-              shipments.length}{' '}
-            shipment
-            {((statusFilter ? statusCounts[statusFilter] : statusCounts.All) ||
-              shipments.length) !== 1
-              ? 's'
-              : ''}{' '}
-            found
+            {t('shipmentCount', {
+              count: (statusFilter ? statusCounts[statusFilter] : statusCounts.All) || shipments.length,
+            })}
           </p>
         </div>
         <Link href="/dashboard/shipments/create" className="btn-primary">
           <Plus className="w-4 h-4" />
-          New shipment
+          {t('newShipment')}
         </Link>
       </div>
 
       {/* Filters */}
       <div className="mb-5 space-y-4">
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap" role="tablist" aria-label="Filter shipments by status">
           {statusTabs.map((tab) => {
             const isActive = tab.value === statusFilter;
             const count =
@@ -259,6 +239,8 @@ export default function ShipmentsPage() {
               <button
                 key={tab.label}
                 type="button"
+                role="tab"
+                aria-selected={isActive}
                 onClick={() => {
                   const params = new URLSearchParams(searchParams as any);
                   if (tab.value) {
@@ -270,7 +252,7 @@ export default function ShipmentsPage() {
                     `/dashboard/shipments${params.toString() ? `?${params.toString()}` : ''}`,
                   );
                 }}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 ${
                   isActive
                     ? 'bg-slate-900 text-white'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -283,14 +265,70 @@ export default function ShipmentsPage() {
         </div>
 
         <div className="relative max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden="true" />
           <input
+            ref={searchInputRef}
             type="text"
-            placeholder="Search shipment ID or address…"
+            placeholder={t('searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search shipments"
             className="input pl-9"
           />
+        </div>
+
+        <div className="flex items-end gap-3 flex-wrap rounded-xl border border-gray-100 bg-white p-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mr-1">
+            <SlidersHorizontal className="w-4 h-4 text-gray-400" />
+            Advanced filters
+          </div>
+          <label className="text-xs text-gray-500">
+            Date field
+            <select
+              value={dateField}
+              onChange={(e) => updateFilterUrl('date', e.target.value === 'updated' ? 'updated' : 'created')}
+              className="input mt-1 text-xs"
+            >
+              <option value="created">Created date</option>
+              <option value="updated">Updated date</option>
+            </select>
+          </label>
+          <label className="text-xs text-gray-500">
+            From
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => updateFilterUrl('from', e.target.value)}
+              className="input mt-1 text-xs"
+            />
+          </label>
+          <label className="text-xs text-gray-500">
+            To
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => updateFilterUrl('to', e.target.value)}
+              className="input mt-1 text-xs"
+            />
+          </label>
+          <label className="text-xs text-gray-500">
+            Counterparty role
+            <select
+              value={counterpartyRole}
+              onChange={(e) => updateFilterUrl('role', e.target.value)}
+              className="input mt-1 text-xs"
+            >
+              {counterpartyRoles.map((role) => (
+                <option key={role.value} value={role.value}>{role.label}</option>
+              ))}
+            </select>
+          </label>
+          {hasAdvancedFilters && (
+            <button type="button" onClick={clearAdvancedFilters} className="btn-ghost text-xs">
+              <X className="w-3.5 h-3.5" />
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
@@ -338,7 +376,7 @@ export default function ShipmentsPage() {
         </div>
       )}
       {loading ? (
-        <div className="space-y-3">
+        <div className="space-y-3" aria-busy="true" aria-label="Loading shipments">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <ShipmentCardSkeleton key={i} />
           ))}
@@ -346,30 +384,30 @@ export default function ShipmentsPage() {
       ) : shipments.length === 0 ? (
         <EmptyState
           icon={Package}
-          title="No shipments yet"
-          description="Create your first shipment to get started."
+          title={t('empty.title')}
+          description={t('empty.description')}
           action={
             <Link
               href="/dashboard/shipments/create"
               className="btn-primary inline-flex"
             >
               <Plus className="w-4 h-4" />
-              New shipment
+              {t('newShipment')}
             </Link>
           }
         />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={Search}
-          title="No results found"
-          description="No shipments match your current search or filter."
+          title={t('empty.noResultsTitle')}
+          description={t('empty.noResultsDescription')}
           action={
             <Link
               href="/dashboard/shipments/create"
               className="btn-primary inline-flex"
             >
               <Plus className="w-4 h-4" />
-              New shipment
+              {t('newShipment')}
             </Link>
           }
         />
@@ -394,5 +432,13 @@ export default function ShipmentsPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function ShipmentsPage() {
+  return (
+    <Suspense fallback={<div className="h-64" />}>
+      <ShipmentsPageContent />
+    </Suspense>
   );
 }

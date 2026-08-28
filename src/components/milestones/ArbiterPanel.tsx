@@ -16,19 +16,15 @@ interface ArbiterPanelProps {
 export function ArbiterPanel({ milestone, shipment, onUpdate }: ArbiterPanelProps) {
   const { address } = useAuthStore();
   const [loading, setLoading] = useState<'approve' | 'reject' | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'approve' | 'reject' | null>(null);
 
   const totalUsdc = parseFloat(stroopsToUsdc(shipment.totalAmount));
   const milestoneUsdc = ((totalUsdc * milestone.paymentPercent) / 100).toFixed(2);
 
   const handle = async (approve: boolean) => {
     const action = approve ? 'approve' : 'reject';
-    const message = approve
-      ? `Approve this milestone and release $${milestoneUsdc} USDC to the supplier?`
-      : `Reject this milestone and reset it back to Pending?`;
 
-    if (!window.confirm(message)) return;
-
-    setLoading(approve ? 'approve' : 'reject');
+    setLoading(action);
     try {
       await resolveDispute({
         callerAddress: address!,
@@ -41,13 +37,14 @@ export function ArbiterPanel({ milestone, shipment, onUpdate }: ArbiterPanelProp
       alert(err?.message ?? `Failed to ${action} milestone`);
     } finally {
       setLoading(null);
+      setConfirmAction(null);
     }
   };
 
   return (
-    <div className="mt-4 rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
+    <div className="mt-4 rounded-xl border-2 border-amber-300 bg-amber-50 p-4" role="alert" aria-live="assertive">
       <div className="flex items-center gap-2 mb-3">
-        <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+        <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" aria-hidden="true" />
         <span className="text-sm font-semibold text-amber-800">Arbiter Action Required</span>
       </div>
 
@@ -69,7 +66,8 @@ export function ArbiterPanel({ milestone, shipment, onUpdate }: ArbiterPanelProp
               }
               target="_blank"
               rel="noreferrer"
-              className="font-mono text-amber-700 underline hover:text-amber-900 truncate max-w-xs"
+              className="font-mono text-amber-700 underline hover:text-amber-900 truncate max-w-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+              aria-label="View proof hash (opens in new tab)"
             >
               {milestone.proofHash}
             </a>
@@ -80,33 +78,60 @@ export function ArbiterPanel({ milestone, shipment, onUpdate }: ArbiterPanelProp
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => handle(true)}
-          disabled={loading !== null}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-        >
-          {loading === 'approve' ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <ThumbsUp className="w-3.5 h-3.5" />
-          )}
-          Approve milestone
-        </button>
+      {confirmAction === null ? (
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setConfirmAction('approve')}
+            disabled={loading !== null}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+            aria-label="Approve this milestone and release funds"
+          >
+            <ThumbsUp className="w-3.5 h-3.5" aria-hidden="true" />
+            Approve milestone
+          </button>
 
-        <button
-          onClick={() => handle(false)}
-          disabled={loading !== null}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-        >
-          {loading === 'reject' ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <ThumbsDown className="w-3.5 h-3.5" />
-          )}
-          Reject milestone
-        </button>
-      </div>
+          <button
+            onClick={() => setConfirmAction('reject')}
+            disabled={loading !== null}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+            aria-label="Reject this milestone and reset to pending"
+          >
+            <ThumbsDown className="w-3.5 h-3.5" aria-hidden="true" />
+            Reject milestone
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2" role="dialog" aria-modal="true" aria-label="Confirm arbiter action">
+          <p className="text-xs font-medium text-amber-900">
+            {confirmAction === 'approve'
+              ? `Approve this milestone and release $${milestoneUsdc} USDC to the supplier?`
+              : `Reject this milestone and reset it back to Pending?`}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handle(confirmAction === 'approve')}
+              disabled={loading !== null}
+              className={confirmAction === 'approve' ? 'btn-primary text-xs' : 'btn-danger text-xs'}
+            >
+              {loading === confirmAction ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+              ) : confirmAction === 'approve' ? (
+                <ThumbsUp className="w-3.5 h-3.5" aria-hidden="true" />
+              ) : (
+                <ThumbsDown className="w-3.5 h-3.5" aria-hidden="true" />
+              )}
+              {confirmAction === 'approve' ? 'Yes, approve' : 'Yes, reject'}
+            </button>
+            <button
+              onClick={() => setConfirmAction(null)}
+              disabled={loading !== null}
+              className="btn-secondary text-xs"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

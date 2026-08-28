@@ -1,8 +1,8 @@
-gi'use client';
+'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, RefreshCw, Loader2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Loader2, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { shipmentsApi } from '@/lib/api/services';
 import { useAuthStore } from '@/lib/hooks/use-auth-store';
@@ -23,6 +23,7 @@ export default function ShipmentDetailPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [secondsAgo, setSecondsAgo] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const loadingRef = useRef<HTMLDivElement>(null);
 
   const fetchShipment = async (isBackground = false) => {
     if (!isBackground) setLoading(true);
@@ -62,7 +63,6 @@ export default function ShipmentDetailPage() {
     };
   }, [id]);
 
-  // Tick "last updated X seconds ago"
   useEffect(() => {
     if (!lastUpdated) return;
     const tick = setInterval(() => {
@@ -70,6 +70,12 @@ export default function ShipmentDetailPage() {
     }, 1000);
     return () => clearInterval(tick);
   }, [lastUpdated]);
+
+  useEffect(() => {
+    if (loading && loadingRef.current) {
+      loadingRef.current.focus();
+    }
+  }, [loading]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -85,8 +91,8 @@ export default function ShipmentDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+      <div ref={loadingRef} className="flex items-center justify-center h-64" tabIndex={-1} role="status" aria-live="polite" aria-label="Loading shipment details">
+        <Loader2 className="w-6 h-6 text-gray-400 animate-spin" aria-hidden="true" />
       </div>
     );
   }
@@ -110,7 +116,7 @@ export default function ShipmentDetailPage() {
       {/* Back nav */}
       <Link
         href="/dashboard/shipments"
-        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-5 transition-colors"
+        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
       >
         <ArrowLeft className="w-4 h-4" />
         All shipments
@@ -140,12 +146,13 @@ export default function ShipmentDetailPage() {
         <button
           onClick={handleSync}
           disabled={syncing}
+          aria-label={syncing ? 'Syncing from chain' : 'Sync from chain'}
           className="btn-secondary text-xs"
         >
           {syncing ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
           ) : (
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
           )}
           Sync from chain
         </button>
