@@ -5,9 +5,11 @@ import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 import { notificationsApi } from '@/lib/api/services';
 import { EmptyState } from '@/components/EmptyState';
 import { timeAgo } from '@/lib/utils';
+import { useAuthStore } from '@/lib/hooks/use-auth-store';
 import type { Notification } from '@/types';
 
 export default function NotificationsPage() {
+  const preferences = useAuthStore((state) => state.notificationPreferences);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +36,13 @@ export default function NotificationsPage() {
     );
   };
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const visibleNotifications = notifications.filter((notification) => {
+    const type = notification.type.toLowerCase();
+    if (type.includes('milestone') || type.includes('proof') || type.includes('dispute')) return preferences.milestoneUpdates;
+    if (type.includes('system') || type.includes('account')) return preferences.systemAlerts;
+    return preferences.shipmentUpdates;
+  });
+  const unreadCount = visibleNotifications.filter((n) => !n.read).length;
 
   return (
     <div>
@@ -46,7 +54,7 @@ export default function NotificationsPage() {
           </p>
         </div>
         {unreadCount > 0 && (
-          <button onClick={handleMarkAllRead} className="btn-secondary text-xs">
+          <button onClick={handleMarkAllRead} aria-label="Mark all notifications as read" className="btn-secondary text-xs">
             <CheckCheck className="w-3.5 h-3.5" />
             Mark all read
           </button>
@@ -54,36 +62,39 @@ export default function NotificationsPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
+        <div className="flex justify-center py-16" role="status" aria-live="polite" aria-label="Loading notifications">
+          <Loader2 className="w-5 h-5 text-gray-300 animate-spin" aria-hidden="true" />
         </div>
-      ) : notifications.length === 0 ? (
+      ) : visibleNotifications.length === 0 ? (
         <EmptyState
           icon={Bell}
           title="No notifications yet"
           description="You're all caught up. We'll notify you when something needs your attention."
         />
       ) : (
-        <div className="card divide-y divide-gray-50">
+        <div className="card divide-y divide-gray-50" role="list" aria-label="Notifications">
           {notifications.map((n) => (
-            <div
+            <button
               key={n.id}
               onClick={() => !n.read && handleMarkRead(n.id)}
-              className={`p-4 flex items-start gap-3 cursor-pointer transition-colors ${
+              className={`w-full text-left p-4 flex items-start gap-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-inset ${
                 n.read ? 'opacity-60' : 'hover:bg-gray-50'
               }`}
+              aria-label={`${n.title}: ${n.message}. ${n.read ? 'Read' : 'Unread'}. Click to mark as read.`}
+              role="listitem"
             >
               <div
                 className={`w-2 h-2 rounded-full flex-shrink-0 mt-2 ${
                   n.read ? 'bg-gray-200' : 'bg-brand-600'
                 }`}
+                aria-hidden="true"
               />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-gray-900 mb-0.5">{n.title}</p>
                 <p className="text-xs text-gray-500 leading-relaxed">{n.message}</p>
                 <p className="text-[10px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}

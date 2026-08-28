@@ -1,26 +1,19 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  Download,
-  X,
-  Plus,
-  Package,
-  Search,
-} from "lucide-react";
-import { shipmentsApi } from "@/lib/api/services";
-import { cancelShipment } from "@/lib/stellar/contract";
-import { useAuthStore } from "@/lib/hooks/use-auth-store";
-import { ShipmentCardSkeleton } from "@/components/shipments/ShipmentCardSkeleton";
-import { EmptyState } from "@/components/EmptyState";
-import { Pagination } from "@/components/Pagination";
-import type { Shipment, ShipmentStatus } from "@/types";
-import { formatDate, shipmentStatusBadge, stroopsToUsdc } from "@/lib/utils";
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Download, Plus, Package, Search, SlidersHorizontal, X } from 'lucide-react';
+import { shipmentsApi } from '@/lib/api/services';
+import { cancelShipment } from '@/lib/stellar/contract';
+import { useAuthStore } from '@/lib/hooks/use-auth-store';
+import { ShipmentCard } from '@/components/shipments/ShipmentCard';
+import { ShipmentCardSkeleton } from '@/components/shipments/ShipmentCardSkeleton';
+import { EmptyState } from '@/components/EmptyState';
+import { Pagination } from '@/components/Pagination';
+import { stroopsToUsdc } from '@/lib/utils';
+import type { Shipment, ShipmentStatus } from '@/types';
+import { useTranslations } from 'next-intl';
 
 const PAGE_LIMIT = 10;
 type SortKey = "createdAt" | "status" | "amount";
@@ -34,47 +27,47 @@ const sortLabels: Record<SortKey, string> = {
 const validSortKeys: SortKey[] = ["createdAt", "status", "amount"];
 const validSortDirections: SortDirection[] = ["asc", "desc"];
 
-export default function ShipmentsPage() {
+function ShipmentsPageContent() {
   const { address } = useAuthStore();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ShipmentStatus | "">("");
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<ShipmentStatus | ''>('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [dateField, setDateField] = useState<'created' | 'updated'>('created');
+  const [counterpartyRole, setCounterpartyRole] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [cancelling, setCancelling] = useState(false);
   const [statusCounts, setStatusCounts] = useState({
     All: 0,
     Active: 0,
     Completed: 0,
     Cancelled: 0,
   });
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [cancelModalOpen, setCancelModalOpen] = useState(false);
-  const [bulkActionLoading, setBulkActionLoading] = useState(false);
-  const [bulkActionError, setBulkActionError] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const requestedSort = searchParams?.get("sort");
-  const requestedDirection = searchParams?.get("direction");
-  const sortKey: SortKey = validSortKeys.includes(requestedSort as SortKey)
-    ? (requestedSort as SortKey)
-    : "createdAt";
-  const sortDirection: SortDirection = validSortDirections.includes(
-    requestedDirection as SortDirection,
-  )
-    ? (requestedDirection as SortDirection)
-    : "desc";
-
-  const statusTabs: Array<{ label: string; value: ShipmentStatus | "" }> = [
-    { label: "All", value: "" },
-    { label: "Active", value: "Active" },
-    { label: "Completed", value: "Completed" },
-    { label: "Cancelled", value: "Cancelled" },
+  const t = useTranslations('dashboard');
+  const statusTabs: Array<{ label: string; value: ShipmentStatus | '' }> = [
+    { label: t('tabs.all'), value: '' },
+    { label: t('tabs.active'), value: 'Active' },
+    { label: t('tabs.completed'), value: 'Completed' },
+    { label: t('tabs.cancelled'), value: 'Cancelled' },
   ];
 
-  const validStatusValues = ["Active", "Completed", "Cancelled"];
+  const validStatusValues = ['Active', 'Completed', 'Cancelled'];
+  const counterpartyRoles = [
+    { label: 'Any role', value: '' },
+    { label: 'Buyer', value: 'buyer' },
+    { label: 'Supplier', value: 'supplier' },
+    { label: 'Logistics', value: 'logistics' },
+    { label: 'Arbiter', value: 'arbiter' },
+  ];
 
   useEffect(() => {
     if (!address) return;
@@ -90,6 +83,7 @@ export default function ShipmentsPage() {
       .then((res) => {
         setShipments(res.data);
         setTotalPages(res.meta.totalPages);
+        setSelectedIds([]);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -105,19 +99,19 @@ export default function ShipmentsPage() {
             shipmentsApi.list({ buyerAddress: address, page: 1, limit: 1 }),
             shipmentsApi.list({
               buyerAddress: address,
-              status: "Active",
+              status: 'Active',
               page: 1,
               limit: 1,
             }),
             shipmentsApi.list({
               buyerAddress: address,
-              status: "Completed",
+              status: 'Completed',
               page: 1,
               limit: 1,
             }),
             shipmentsApi.list({
               buyerAddress: address,
-              status: "Cancelled",
+              status: 'Cancelled',
               page: 1,
               limit: 1,
             }),
@@ -144,19 +138,86 @@ export default function ShipmentsPage() {
       return;
     }
 
-    setStatusFilter(paramStatus as ShipmentStatus | "");
+    setStatusFilter(paramStatus as ShipmentStatus | '');
+    setFromDate(searchParams?.get('from') ?? '');
+    setToDate(searchParams?.get('to') ?? '');
+    setDateField(searchParams?.get('date') === 'updated' ? 'updated' : 'created');
+    setCounterpartyRole(searchParams?.get('role') ?? '');
   }, [searchParams]);
+
+  useEffect(() => {
+    if (searchParams?.get('focus') !== 'search') return;
+    searchInputRef.current?.focus();
+    router.replace('/dashboard/shipments');
+  }, [router, searchParams]);
 
   // Reset to page 1 when search or filter changes
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, fromDate, toDate, dateField, counterpartyRole]);
 
-  const filtered = shipments.filter(
-    (s) =>
-      s.id.toLowerCase().includes(search.toLowerCase()) ||
-      s.supplierAddress.toLowerCase().includes(search.toLowerCase()),
-  );
+  const updateFilterUrl = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(key, value);
+    else params.delete(key);
+    router.replace(`/dashboard/shipments${params.toString() ? `?${params.toString()}` : ''}`);
+  };
+
+  const clearAdvancedFilters = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('from');
+    params.delete('to');
+    params.delete('date');
+    params.delete('role');
+    router.replace(`/dashboard/shipments${params.toString() ? `?${params.toString()}` : ''}`);
+  };
+
+  const hasAdvancedFilters = fromDate || toDate || dateField !== 'created' || counterpartyRole;
+
+  const filtered = shipments.filter((shipment) => {
+    const matchesSearch =
+      shipment.id.toLowerCase().includes(search.toLowerCase()) ||
+      shipment.supplierAddress.toLowerCase().includes(search.toLowerCase());
+    const filterDate = (dateField === 'updated' ? shipment.updatedAt : shipment.createdAt).slice(0, 10);
+    const matchesFrom = !fromDate || filterDate >= fromDate;
+    const matchesTo = !toDate || filterDate <= toDate;
+    const roleAddress = counterpartyRole
+      ? shipment[`${counterpartyRole}Address` as 'buyerAddress' | 'supplierAddress' | 'logisticsAddress' | 'arbiterAddress']
+      : '';
+    const matchesRole = !counterpartyRole || Boolean(roleAddress && roleAddress !== address);
+    return matchesSearch && matchesFrom && matchesTo && matchesRole;
+  });
+
+  const exportCsv = () => {
+    const columns = [
+      'Shipment ID', 'Status', 'Created At', 'Updated At', 'Buyer',
+      'Supplier', 'Logistics', 'Arbiter', 'Total Amount', 'Released Amount',
+    ];
+    const escapeCsv = (value: string | number | null) => {
+      const text = String(value ?? '');
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    const rows = filtered.map((shipment) => [
+      shipment.id,
+      shipment.status,
+      shipment.createdAt,
+      shipment.updatedAt,
+      shipment.buyerAddress,
+      shipment.supplierAddress,
+      shipment.logisticsAddress,
+      shipment.arbiterAddress,
+      shipment.totalAmount,
+      shipment.releasedAmount,
+    ]);
+    const csv = [columns, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
+    const blob = new Blob([`${csv}\n`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `chainsettle-shipments-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const sortedShipments = useMemo(
     () =>
@@ -310,25 +371,20 @@ export default function ShipmentsPage() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Shipments</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {(statusFilter ? statusCounts[statusFilter] : statusCounts.All) ||
-              shipments.length}{" "}
-            shipment
-            {((statusFilter ? statusCounts[statusFilter] : statusCounts.All) ||
-              shipments.length) !== 1
-              ? "s"
-              : ""}{" "}
-            found
+            {t('shipmentCount', {
+              count: (statusFilter ? statusCounts[statusFilter] : statusCounts.All) || shipments.length,
+            })}
           </p>
         </div>
         <Link href="/dashboard/shipments/create" className="btn-primary">
           <Plus className="w-4 h-4" />
-          New shipment
+          {t('newShipment')}
         </Link>
       </div>
 
       {/* Filters */}
       <div className="mb-5 space-y-4">
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap" role="tablist" aria-label="Filter shipments by status">
           {statusTabs.map((tab) => {
             const isActive = tab.value === statusFilter;
             const count =
@@ -338,6 +394,8 @@ export default function ShipmentsPage() {
               <button
                 key={tab.label}
                 type="button"
+                role="tab"
+                aria-selected={isActive}
                 onClick={() => {
                   const params = new URLSearchParams(searchParams as any);
                   if (tab.value) {
@@ -346,10 +404,10 @@ export default function ShipmentsPage() {
                     params.delete("status");
                   }
                   router.replace(
-                    `/dashboard/shipments${params.toString() ? `?${params.toString()}` : ""}`,
+                    `/dashboard/shipments${params.toString() ? `?${params.toString()}` : ''}`,
                   );
                 }}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 ${
                   isActive
                     ? "bg-slate-900 text-white"
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
@@ -362,60 +420,118 @@ export default function ShipmentsPage() {
         </div>
 
         <div className="relative max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden="true" />
           <input
+            ref={searchInputRef}
             type="text"
-            placeholder="Search shipment ID or address…"
+            placeholder={t('searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search shipments"
             className="input pl-9"
           />
+        </div>
+
+        <div className="flex items-end gap-3 flex-wrap rounded-xl border border-gray-100 bg-white p-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mr-1">
+            <SlidersHorizontal className="w-4 h-4 text-gray-400" />
+            Advanced filters
+          </div>
+          <label className="text-xs text-gray-500">
+            Date field
+            <select
+              value={dateField}
+              onChange={(e) => updateFilterUrl('date', e.target.value === 'updated' ? 'updated' : 'created')}
+              className="input mt-1 text-xs"
+            >
+              <option value="created">Created date</option>
+              <option value="updated">Updated date</option>
+            </select>
+          </label>
+          <label className="text-xs text-gray-500">
+            From
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => updateFilterUrl('from', e.target.value)}
+              className="input mt-1 text-xs"
+            />
+          </label>
+          <label className="text-xs text-gray-500">
+            To
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => updateFilterUrl('to', e.target.value)}
+              className="input mt-1 text-xs"
+            />
+          </label>
+          <label className="text-xs text-gray-500">
+            Counterparty role
+            <select
+              value={counterpartyRole}
+              onChange={(e) => updateFilterUrl('role', e.target.value)}
+              className="input mt-1 text-xs"
+            >
+              {counterpartyRoles.map((role) => (
+                <option key={role.value} value={role.value}>{role.label}</option>
+              ))}
+            </select>
+          </label>
+          {hasAdvancedFilters && (
+            <button type="button" onClick={clearAdvancedFilters} className="btn-ghost text-xs">
+              <X className="w-3.5 h-3.5" />
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
       {/* Shipments list */}
-      {bulkActionError && (
-        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {bulkActionError}
-        </div>
-      )}
-      {selectedIds.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-100 bg-brand-50 px-4 py-3">
-          <p className="text-sm font-medium text-brand-900">
-            {selectedIds.length} shipment{selectedIds.length === 1 ? "" : "s"}{" "}
-            selected
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={exportSelected}
-              className="btn-secondary text-xs"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Export selected
-            </button>
-            {canBulkCancel && cancellableShipments.length > 0 && (
+      {!loading && filtered.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={toggleSelectAll}
+              className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+            />
+            Select all visible
+          </label>
+          {selectedIds.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">
+                {selectedIds.length} selected
+              </span>
               <button
                 type="button"
-                onClick={() => setCancelModalOpen(true)}
-                className="btn-danger text-xs"
+                onClick={exportSelected}
+                className="btn-secondary text-xs"
               >
-                Cancel {cancellableShipments.length} selected
+                <Download className="h-3.5 w-3.5" /> Export selected
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setSelectedIds([])}
-              className="btn-ghost text-xs"
-            >
-              <X className="h-3.5 w-3.5" />
-              Clear
-            </button>
-          </div>
+              {cancellableShipments.length > 0 && (
+                <button
+                  type="button"
+                  onClick={cancelSelected}
+                  disabled={cancelling}
+                  className="btn-secondary text-xs text-red-600 hover:bg-red-50"
+                >
+                  {cancelling ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <X className="h-3.5 w-3.5" />
+                  )}
+                  Cancel selected
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
       {loading ? (
-        <div className="space-y-3">
+        <div className="space-y-3" aria-busy="true" aria-label="Loading shipments">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <ShipmentCardSkeleton key={i} />
           ))}
@@ -423,114 +539,44 @@ export default function ShipmentsPage() {
       ) : shipments.length === 0 ? (
         <EmptyState
           icon={Package}
-          title="No shipments yet"
-          description="Create your first shipment to get started."
+          title={t('empty.title')}
+          description={t('empty.description')}
           action={
             <Link
               href="/dashboard/shipments/create"
               className="btn-primary inline-flex"
             >
               <Plus className="w-4 h-4" />
-              New shipment
+              {t('newShipment')}
             </Link>
           }
         />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={Search}
-          title="No results found"
-          description="No shipments match your current search or filter."
+          title={t('empty.noResultsTitle')}
+          description={t('empty.noResultsDescription')}
           action={
             <Link
               href="/dashboard/shipments/create"
               className="btn-primary inline-flex"
             >
               <Plus className="w-4 h-4" />
-              New shipment
+              {t('newShipment')}
             </Link>
           }
         />
       ) : (
         <>
-          <div className="card overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-100 bg-gray-50/70 text-xs text-gray-500">
-                <tr>
-                  <th className="w-12 px-5 py-3 font-medium">
-                    <input
-                      type="checkbox"
-                      checked={allVisibleSelected}
-                      onChange={toggleAllVisible}
-                      aria-label="Select all visible shipments"
-                    />
-                  </th>
-                  <th className="px-5 py-3 font-medium">Shipment</th>
-                  <th className="px-5 py-3 font-medium">Supplier</th>
-                  {(["status", "amount", "createdAt"] as SortKey[]).map(
-                    (key) => (
-                      <th
-                        key={key}
-                        aria-sort={
-                          sortKey === key
-                            ? sortDirection === "asc"
-                              ? "ascending"
-                              : "descending"
-                            : "none"
-                        }
-                        className="px-5 py-3 font-medium"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => updateSort(key)}
-                          className="inline-flex items-center gap-1.5 hover:text-gray-900"
-                          aria-label={`Sort by ${sortLabels[key]}`}
-                        >
-                          {sortLabels[key]}
-                          {sortIcon(key)}
-                        </button>
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {sortedShipments.map((shipment) => (
-                  <tr key={shipment.id} className="hover:bg-gray-50">
-                    <td className="px-5 py-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(shipment.id)}
-                        onChange={() => toggleSelection(shipment.id)}
-                        aria-label={`Select shipment ${shipment.id}`}
-                      />
-                    </td>
-                    <td className="px-5 py-4">
-                      <Link
-                        href={`/dashboard/shipments/${shipment.id}`}
-                        className="font-mono text-xs font-semibold text-gray-900 hover:text-brand-600"
-                      >
-                        {shipment.id}
-                      </Link>
-                    </td>
-                    <td className="px-5 py-4 font-mono text-xs text-gray-500">
-                      {shipment.supplierAddress.slice(0, 5)}...
-                      {shipment.supplierAddress.slice(-4)}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className={shipmentStatusBadge(shipment.status)}>
-                        {shipment.status}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4 font-medium tabular-nums text-gray-900">
-                      ${stroopsToUsdc(shipment.totalAmount)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-4 text-gray-500">
-                      {formatDate(shipment.createdAt)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {filtered.map((shipment) => (
+              <ShipmentCard
+                key={shipment.id}
+                shipment={shipment}
+                selected={selectedIds.includes(shipment.id)}
+                onSelect={(selected) => toggleSelection(shipment.id, selected)}
+              />
+            ))}
           </div>
           <Pagination
             page={page}
@@ -586,5 +632,13 @@ export default function ShipmentsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ShipmentsPage() {
+  return (
+    <Suspense fallback={<div className="h-64" />}>
+      <ShipmentsPageContent />
+    </Suspense>
   );
 }

@@ -80,7 +80,10 @@ async function invokeContract(
 
   // Submit
   const response = await rpc.sendTransaction(
-    new (await import('@stellar/stellar-sdk')).Transaction(signedXdr),
+    new (await import('@stellar/stellar-sdk')).Transaction(
+      signedXdr,
+      NETWORK_PASSPHRASE,
+    ),
   );
 
   if (response.status === 'ERROR') {
@@ -101,6 +104,9 @@ async function waitForConfirmation(txHash: string): Promise<string> {
     const result = await rpc.getTransaction(txHash);
 
     if (result.status === SorobanRpc.Api.GetTransactionStatus.SUCCESS) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('chainsettle:transaction-complete'));
+      }
       return txHash;
     }
 

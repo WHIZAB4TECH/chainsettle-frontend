@@ -10,12 +10,11 @@
 
 import {
   isConnected,
-  getAddress,
+  getPublicKey,
   signTransaction,
   signAuthEntry,
   requestAccess,
   getNetwork,
-  WatchWalletChanges,
 } from '@stellar/freighter-api';
 
 // ----------------------------------------------------------------
@@ -25,8 +24,7 @@ import {
 /** Check if Freighter extension is installed in the browser */
 export async function isFreighterInstalled(): Promise<boolean> {
   try {
-    const result = await isConnected();
-    return result.isConnected;
+    return await isConnected();
   } catch {
     return false;
   }
@@ -34,31 +32,18 @@ export async function isFreighterInstalled(): Promise<boolean> {
 
 /** Request access to the user's Stellar address */
 export async function connectFreighter(): Promise<string> {
-  const access = await requestAccess();
-  if (access.error) {
-    throw new Error(access.error);
-  }
-
-  const address = await getUserAddress();
-  return address;
+  await requestAccess();
+  return getUserAddress();
 }
 
 /** Get the current user's Stellar public key */
 export async function getUserAddress(): Promise<string> {
-  const result = await getAddress();
-  if (result.error) {
-    throw new Error(result.error);
-  }
-  return result.address;
+  return getPublicKey();
 }
 
 /** Get the current network the wallet is connected to */
 export async function getWalletNetwork(): Promise<string> {
-  const result = await getNetwork();
-  if (result.error) {
-    throw new Error(result.error);
-  }
-  return result.network;
+  return getNetwork();
 }
 
 // ----------------------------------------------------------------
@@ -74,11 +59,7 @@ export async function getWalletNetwork(): Promise<string> {
  * @returns Signed XDR string ready for submission
  */
 export async function signTx(xdr: string, networkPassphrase: string): Promise<string> {
-  const result = await signTransaction(xdr, { networkPassphrase });
-  if (result.error) {
-    throw new Error(result.error);
-  }
-  return result.signedTxXdr;
+  return signTransaction(xdr, { networkPassphrase });
 }
 
 /**
@@ -93,11 +74,7 @@ export async function signAuth(
   entryXdr: string,
   validUntilLedger: number,
 ): Promise<string> {
-  const result = await signAuthEntry(entryXdr, { accountToSign: await getUserAddress() });
-  if (result.error) {
-    throw new Error(result.error);
-  }
-  return result.signedAuthEntry;
+  return signAuthEntry(entryXdr, { accountToSign: await getUserAddress() });
 }
 
 // ----------------------------------------------------------------
@@ -155,14 +132,13 @@ export async function signNonce(nonce: string, networkPassphrase: string): Promi
 export function watchWallet(
   onChange: (address: string, network: string) => void,
 ): () => void {
-  const watcher = new WatchWalletChanges(3000);
-  watcher.watch(async () => {
+  const interval = setInterval(async () => {
     try {
       const address = await getUserAddress();
       const network = await getWalletNetwork();
       onChange(address, network);
     } catch {}
-  });
+  }, 3000);
 
-  return () => watcher.stop();
+  return () => clearInterval(interval);
 }

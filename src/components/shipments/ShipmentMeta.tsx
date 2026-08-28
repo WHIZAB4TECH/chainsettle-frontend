@@ -27,8 +27,8 @@ export function ShipmentMeta({ shipment }: { shipment: Shipment }) {
                 <StellarLink value={value} type={label === 'Tx hash' ? 'tx' : 'account'} className="font-mono text-blue-600 hover:text-blue-800 truncate" />
                 <button
                   onClick={() => copyToClipboard(value)}
-                  className="text-gray-300 hover:text-gray-600 transition-colors flex-shrink-0"
-                  aria-label="Copy"
+                  aria-label={`Copy ${label.toLowerCase()} to clipboard`}
+                  className="text-gray-300 hover:text-gray-600 transition-colors flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
                 >
                   <Copy className="w-3 h-3" />
                 </button>

@@ -1,28 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import {
-  Loader2,
-  Wallet,
-  ShieldCheck,
-  Zap,
-  Globe,
-  ExternalLink,
-  X,
-} from "lucide-react";
-import {
-  connectFreighter,
-  isFreighterInstalled,
-  signNonce,
-} from "@/lib/stellar/freighter";
-import { authApi } from "@/lib/api/services";
-import { useAuthStore } from "@/lib/hooks/use-auth-store";
-import { Networks } from "@stellar/stellar-sdk";
+import { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Loader2, Wallet, ShieldCheck, Zap, Globe } from 'lucide-react';
+import { connectFreighter, isFreighterInstalled, signNonce } from '@/lib/stellar/freighter';
+import { authApi } from '@/lib/api/services';
+import { useAuthStore } from '@/lib/hooks/use-auth-store';
+import { Networks } from '@stellar/stellar-sdk';
 
 type Step = "idle" | "connecting" | "signing" | "verifying" | "done";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl") ?? "/dashboard/shipments";
@@ -33,13 +21,16 @@ export default function LoginPage() {
   const [step, setStep] = useState<Step>("idle");
   const [error, setError] = useState<string | null>(null);
   const [hasFreighter, setHasFreighter] = useState<boolean | null>(null);
-  const [installModalOpen, setInstallModalOpen] = useState(false);
-  const [checkingFreighter, setCheckingFreighter] = useState(false);
+  const errorRef = useRef<HTMLDivElement>(null);
+  const statusRef = useRef<HTMLDivElement>(null);
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (isConnected) router.replace(callbackUrl);
   }, [isConnected, router, callbackUrl]);
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   // Check for Freighter on mount
   useEffect(() => {
@@ -56,15 +47,12 @@ export default function LoginPage() {
     }
 
     try {
-      // Step 1: Connect wallet
-      setStep("connecting");
+      setStep('connecting');
       const address = await connectFreighter();
 
-      // Step 2: Get nonce from backend
       const nonce = await authApi.getNonce(address);
 
-      // Step 3: Sign the nonce
-      setStep("signing");
+      setStep('signing');
       const networkPassphrase =
         process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet"
           ? Networks.PUBLIC
@@ -72,8 +60,7 @@ export default function LoginPage() {
 
       const signedNonce = await signNonce(nonce, networkPassphrase);
 
-      // Step 4: Verify and get JWT
-      setStep("verifying");
+      setStep('verifying');
       const { accessToken, user } = await authApi.login({
         stellarAddress: address,
         signedNonce,
@@ -144,6 +131,7 @@ export default function LoginPage() {
                 target="_blank"
                 rel="noreferrer"
                 className="btn-primary text-xs px-3 py-1.5"
+                aria-label="Install Freighter wallet (opens in new tab)"
               >
                 Install Freighter →
               </a>
@@ -152,7 +140,7 @@ export default function LoginPage() {
 
           {/* Error */}
           {error && (
-            <div className="mb-4 p-3.5 rounded-xl bg-red-50 border border-red-100">
+            <div ref={errorRef} tabIndex={-1} className="mb-4 p-3.5 rounded-xl bg-red-50 border border-red-100" role="alert" aria-live="assertive">
               <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
@@ -160,17 +148,18 @@ export default function LoginPage() {
           {/* Connect button */}
           <button
             onClick={handleConnect}
-            disabled={isLoading}
+            disabled={isLoading || hasFreighter === false}
+            aria-describedby={isLoading ? 'login-status' : undefined}
             className="btn-primary w-full text-base py-3"
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {stepLabel[step]}
+                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                <span id="login-status">{stepLabel[step]}</span>
               </>
             ) : (
               <>
-                <Wallet className="w-4 h-4" />
+                <Wallet className="w-4 h-4" aria-hidden="true" />
                 {stepLabel.idle}
               </>
             )}
@@ -178,41 +167,27 @@ export default function LoginPage() {
 
           {/* Steps indicator */}
           {isLoading && (
-            <div className="mt-4 space-y-2">
-              {(["connecting", "signing", "verifying"] as Step[]).map(
-                (s, i) => {
-                  const stepOrder: Step[] = [
-                    "connecting",
-                    "signing",
-                    "verifying",
-                  ];
-                  const currentIdx = stepOrder.indexOf(step);
-                  const thisIdx = stepOrder.indexOf(s);
-                  const isDone = thisIdx < currentIdx;
-                  const isCurrent = s === step;
+            <div ref={statusRef} className="mt-4 space-y-2" role="status" aria-live="polite" aria-label="Login progress">
+              {(['connecting', 'signing', 'verifying'] as Step[]).map((s, i) => {
+                const stepOrder: Step[] = ['connecting', 'signing', 'verifying'];
+                const currentIdx = stepOrder.indexOf(step);
+                const thisIdx = stepOrder.indexOf(s);
+                const isDone = thisIdx < currentIdx;
+                const isCurrent = s === step;
 
-                  return (
-                    <div key={s} className="flex items-center gap-2.5 text-xs">
-                      <div
-                        className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
-                          isDone
-                            ? "bg-green-500 text-white"
-                            : isCurrent
-                              ? "bg-brand-600 text-white"
-                              : "bg-gray-100 text-gray-400"
-                        }`}
-                      >
-                        {isDone ? "✓" : i + 1}
-                      </div>
-                      <span
-                        className={
-                          isCurrent
-                            ? "text-gray-900 font-medium"
-                            : "text-gray-400"
-                        }
-                      >
-                        {stepLabel[s]}
-                      </span>
+                return (
+                  <div key={s} className="flex items-center gap-2.5 text-xs">
+                    <div
+                      className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+                        isDone
+                          ? 'bg-green-500 text-white'
+                          : isCurrent
+                          ? 'bg-brand-600 text-white'
+                          : 'bg-gray-100 text-gray-400'
+                      }`}
+                      aria-hidden="true"
+                    >
+                      {isDone ? '✓' : i + 1}
                     </div>
                   );
                 },
@@ -292,7 +267,7 @@ export default function LoginPage() {
             { icon: Globe, label: "Cross-border", sub: "Anywhere, any sector" },
           ].map(({ icon: Icon, label, sub }) => (
             <div key={label} className="card p-3">
-              <Icon className="w-4 h-4 text-brand-600 mx-auto mb-1.5" />
+              <Icon className="w-4 h-4 text-brand-600 mx-auto mb-1.5" aria-hidden="true" />
               <p className="text-xs font-medium text-gray-700">{label}</p>
               <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>
             </div>
@@ -300,5 +275,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }
