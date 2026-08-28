@@ -11,6 +11,20 @@ import { generateShipmentId, usdcToStroops } from '@/lib/utils';
 import type { CreateMilestoneInput } from '@/types';
 
 const USDC_ADDRESS = process.env.NEXT_PUBLIC_USDC_ADDRESS!;
+const DEFAULT_MILESTONES: CreateMilestoneInput[] = [
+  { name: 'Goods Dispatched', paymentPercent: 25 },
+  { name: 'In Transit', paymentPercent: 50 },
+  { name: 'Delivered', paymentPercent: 25 },
+];
+
+type ShipmentDraft = {
+  shipmentId: string;
+  supplierAddress: string;
+  logisticsAddress: string;
+  arbiterAddress: string;
+  totalUsdc: string;
+  milestones: CreateMilestoneInput[];
+};
 
 const generateInputId = (suffix: string) => `create-${suffix}`;
 
@@ -21,19 +35,58 @@ export default function CreateShipmentPage() {
   const txStepId = useId();
   const errorRef = useRef<HTMLDivElement>(null);
 
-  const [shipmentId] = useState(generateShipmentId);
+  const [shipmentId, setShipmentId] = useState(generateShipmentId);
   const [supplierAddress, setSupplierAddress] = useState('');
   const [logisticsAddress, setLogisticsAddress] = useState('');
   const [arbiterAddress, setArbiterAddress] = useState('');
   const [totalUsdc, setTotalUsdc] = useState('');
-  const [milestones, setMilestones] = useState<CreateMilestoneInput[]>([
-    { name: 'Goods Dispatched', paymentPercent: 25 },
-    { name: 'In Transit', paymentPercent: 50 },
-    { name: 'Delivered', paymentPercent: 25 },
-  ]);
+  const [milestones, setMilestones] = useState<CreateMilestoneInput[]>(DEFAULT_MILESTONES);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txStep, setTxStep] = useState('');
+  const draftLoaded = useRef(false);
+
+  useEffect(() => {
+    if (!address) return;
+
+    draftLoaded.current = false;
+    const key = `chainsetttle_shipment_draft_${address}`;
+    const savedDraft = localStorage.getItem(key);
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft) as Partial<ShipmentDraft>;
+        if (draft.shipmentId) setShipmentId(draft.shipmentId);
+        if (typeof draft.supplierAddress === 'string') setSupplierAddress(draft.supplierAddress);
+        if (typeof draft.logisticsAddress === 'string') setLogisticsAddress(draft.logisticsAddress);
+        if (typeof draft.arbiterAddress === 'string') setArbiterAddress(draft.arbiterAddress);
+        if (typeof draft.totalUsdc === 'string') setTotalUsdc(draft.totalUsdc);
+        if (Array.isArray(draft.milestones) && draft.milestones.length) {
+          setMilestones(draft.milestones);
+        }
+      } catch {
+        localStorage.removeItem(key);
+      }
+    }
+    draftLoaded.current = true;
+  }, [address]);
+
+  useEffect(() => {
+    if (!address || !draftLoaded.current || loading) return;
+
+    const timeout = window.setTimeout(() => {
+      const draft: ShipmentDraft = {
+        shipmentId,
+        supplierAddress,
+        logisticsAddress,
+        arbiterAddress,
+        totalUsdc,
+        milestones,
+      };
+      localStorage.setItem(`chainsetttle_shipment_draft_${address}`, JSON.stringify(draft));
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [address, shipmentId, supplierAddress, logisticsAddress, arbiterAddress, totalUsdc, milestones, loading]);
 
   const totalPercent = milestones.reduce((s, m) => s + m.paymentPercent, 0);
   const percentValid = totalPercent === 100;
@@ -86,6 +139,7 @@ export default function CreateShipmentPage() {
         txHash,
       });
 
+      localStorage.removeItem(`chainsetttle_shipment_draft_${address}`);
       router.push(`/dashboard/shipments/${shipmentId}`);
     } catch (err: any) {
       setError(err?.message ?? 'Transaction failed. Please try again.');
@@ -109,6 +163,7 @@ export default function CreateShipmentPage() {
       <p className="text-sm text-gray-500 mb-6">
         Lock USDC in a Soroban escrow contract. Payment releases automatically as milestones are confirmed.
       </p>
+      <p className="text-xs text-gray-400 mb-5">Your unfinished form is saved locally in this browser.</p>
 
       {error && (
         <div id={errorId} ref={errorRef} tabIndex={-1} className="mb-5 p-4 rounded-xl bg-red-50 border border-red-100 flex gap-3" role="alert" aria-live="assertive">

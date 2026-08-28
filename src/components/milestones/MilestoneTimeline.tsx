@@ -56,6 +56,15 @@ export function MilestoneTimeline({ shipment, userRole, onUpdate }: Props) {
   );
 }
 
+function stepStatusIcon(status: MilestoneStatus) {
+  if (status === 'Confirmed' || status === 'Resolved') {
+    return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+  }
+  if (status === 'ProofSubmitted') return <Upload className="h-4 w-4 text-amber-600" />;
+  if (status === 'Disputed') return <AlertTriangle className="h-4 w-4 text-red-600" />;
+  return <Clock className="h-4 w-4 text-gray-500" />;
+}
+
 function MilestoneRow({
   milestone,
   shipment,
@@ -90,7 +99,7 @@ function MilestoneRow({
     Resolved:       <CheckCircle2 className="w-4 h-4 text-purple-500" />,
   };
 
-  const wrap = async (fn: () => Promise<void>) => {
+  const wrap = async (fn: () => Promise<unknown>) => {
     if (!address || loading) return;
     setLoading(true);
     try {
@@ -155,7 +164,13 @@ function MilestoneRow({
     address === shipment.arbiterAddress;
 
   return (
-    <div className="p-5">
+    <div
+      id={`milestone-${milestone.id}`}
+      className={cn(
+        'p-5 transition-colors duration-500',
+        isSelected && 'bg-brand-50/50 ring-2 ring-inset ring-brand-200',
+      )}
+    >
       <div className="flex items-start gap-4">
         {/* Status icon */}
         <div

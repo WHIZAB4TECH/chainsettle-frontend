@@ -80,7 +80,10 @@ async function invokeContract(
 
   // Submit
   const response = await rpc.sendTransaction(
-    new (await import('@stellar/stellar-sdk')).Transaction(signedXdr),
+    new (await import('@stellar/stellar-sdk')).Transaction(
+      signedXdr,
+      NETWORK_PASSPHRASE,
+    ),
   );
 
   if (response.status === 'ERROR') {
