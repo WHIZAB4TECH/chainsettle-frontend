@@ -1,0 +1,36 @@
+{
+  "navigation": {
+    "shipments": "Shipments",
+    "notifications": "Notifications",
+    "chainEvents": "Chain Events",
+    "signOut": "Sign out",
+    "notConnected": "Not connected",
+    "network": "Stellar {network}",
+    "mainnet": "Mainnet",
+    "testnet": "Testnet",
+    "copyAddress": "Copy address",
+    "copied": "Copied!",
+    "viewOnStellarExpert": "View on Stellar Expert",
+    "disconnectWallet": "Disconnect wallet",
+    "toggleSidebar": "Toggle sidebar",
+    "notificationsLabel": "Notifications"
+  },
+  "dashboard": {
+    "title": "Shipments",
+    "shipmentCount": "{count, plural, =1 {# shipment found} other {# shipments found}}",
+    "newShipment": "New shipment",
+    "searchPlaceholder": "Search shipment ID or address...",
+    "tabs": {
+      "all": "All",
+      "active": "Active",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "empty": {
+      "title": "No shipments yet",
+      "description": "Create your first shipment to get started.",
+      "noResultsTitle": "No results found",
+      "noResultsDescription": "No shipments match your current search or filter."
+    }
+  }
+}
